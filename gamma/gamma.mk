@@ -92,7 +92,7 @@ PreBuild:
 ## Objects
 ##
 $(IntermediateDirectory)/main.cpp$(ObjectSuffix): main.cpp $(IntermediateDirectory)/main.cpp$(DependSuffix)
-	$(CXX) $(IncludePCH) $(SourceSwitch) "/home/anton/1/cpp/2019/03Gamma/gamma/main.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/main.cpp$(ObjectSuffix) $(IncludePath)
+	$(CXX) $(IncludePCH) $(SourceSwitch) "main.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/main.cpp$(ObjectSuffix) $(IncludePath)
 $(IntermediateDirectory)/main.cpp$(DependSuffix): main.cpp
 	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/main.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/main.cpp$(DependSuffix) -MM main.cpp
 
@@ -100,7 +100,7 @@ $(IntermediateDirectory)/main.cpp$(PreprocessSuffix): main.cpp
 	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/main.cpp$(PreprocessSuffix) main.cpp
 
 $(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix): src/gamma.cpp $(IntermediateDirectory)/src_gamma.cpp$(DependSuffix)
-	$(CXX) $(IncludePCH) $(SourceSwitch) "/home/anton/1/cpp/2019/03Gamma/gamma/src/gamma.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix) $(IncludePath)
+	$(CXX) $(IncludePCH) $(SourceSwitch) "src/gamma.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix) $(IncludePath)
 $(IntermediateDirectory)/src_gamma.cpp$(DependSuffix): src/gamma.cpp
 	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/src_gamma.cpp$(DependSuffix) -MM src/gamma.cpp
 
@@ -108,7 +108,7 @@ $(IntermediateDirectory)/src_gamma.cpp$(PreprocessSuffix): src/gamma.cpp
 	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/src_gamma.cpp$(PreprocessSuffix) src/gamma.cpp
 
 $(IntermediateDirectory)/src_display.cpp$(ObjectSuffix): src/display.cpp $(IntermediateDirectory)/src_display.cpp$(DependSuffix)
-	$(CXX) $(IncludePCH) $(SourceSwitch) "/home/anton/1/cpp/2019/03Gamma/gamma/src/display.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_display.cpp$(ObjectSuffix) $(IncludePath)
+	$(CXX) $(IncludePCH) $(SourceSwitch) "src/display.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_display.cpp$(ObjectSuffix) $(IncludePath)
 $(IntermediateDirectory)/src_display.cpp$(DependSuffix): src/display.cpp
 	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/src_display.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/src_display.cpp$(DependSuffix) -MM src/display.cpp
 
