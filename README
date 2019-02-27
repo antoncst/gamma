@@ -1,11 +1,22 @@
 Gamma.
 File encryption utility.
+
 Developed in the Codelite IDE.
-Platforms: linux, windows. 
+To make project use command
+make -j2 -e -f Makefile 
+
+Platforms: linux, windows.
 The platform is specified in gamma/include/platform.h
+Algorithm designed by Sergey Scherbakov.
 
 Гамма.
 Утилита для шифрования файлов.
+
 Для разработки использовалась IDE Codelite.
-Платформы: linux, windows. 
+Для сборки проекта используйте команду
+make -j2 -e -f Makefile 
+
+Платформы: linux, windows.
 Платформа задаётся в файле gamma/include/platform.h
+Создатель алгоритма Сергей Щербаков.
+

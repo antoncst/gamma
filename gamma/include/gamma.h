@@ -6,11 +6,9 @@
 #include <string>
 #include <fstream>
 
-using namespace std ;
-
 class GammaCrypt
 {
-    static const size_t block_size = 32 ;
+    static const size_t block_size = 65536 ;
     static const size_t quantum_size = sizeof ( unsigned) ; // block size of one calculating operation (probably 32 or 64 bit) 
                                             // размер блока одной вычислительной операции (наверняка 32 или 64 бита)
     static const size_t n_quantum = block_size / quantum_size ;
@@ -18,6 +16,13 @@ class GammaCrypt
     typedef unsigned t_block_random[ n_quantum + 1 ] ;
     
     void GenerateRandom() ;
+    void TransformRandom() ;
+    void BitTransformRandom() ;
+    void Bit2TransformRandom() ;
+    void Bit4TransformRandom() ;
+    void ByteTransformRandom() ;
+    void WordTransformRandom() ;
+    void QuadTransformRandom() ;
     bool OpenFiles() ;  // in and out files
     void WriteHead() ;
     void Crypt() ;
@@ -29,21 +34,21 @@ class GammaCrypt
     t_block m_block_source ;
     t_block m_block_dest ;
 
-    const string m_in_filename ;
-    const string m_out_filename ;
-    const string m_password ;
+    const std::string m_in_filename ;
+    const std::string m_out_filename ;
+    const std::string m_password ;
     
-    ifstream m_ifs ;
-    ofstream m_ofs ;
+    std::ifstream m_ifs ;
+    std::ofstream m_ofs ;
     
 public:
-    GammaCrypt( const string in_filename, const string out_filename, const string password ) ;
+    GammaCrypt( const std::string in_filename, const std::string out_filename, const std::string password ) ;
     void Encrypt() ;
     void Decrypt() ;
     
 } ;
 
-static const string help_string  = 
+static const std::string help_string  = 
     "Usage:\n" 
     "gamma [-command] [file1] [file2]\n"
     "commands:\n"

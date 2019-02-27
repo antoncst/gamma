@@ -91,7 +91,8 @@ int main(int argc, char **argv)
         out_file = "source" ;
 		psw_input_twice = false ;
     }
-    string password("1234567890AB" ) ;
+    string password ;
+    //password = "1234567890AB" ;
     
     if ( EnterPassword( password , psw_input_twice ) == 1 )
         return 2 ;
