@@ -5,8 +5,8 @@
 ## Release
 ProjectName            :=gamma
 ConfigurationName      :=Release
-WorkspacePath          :=/home/anton/1/cpp/2019/03Gamma
-ProjectPath            :=/home/anton/1/cpp/2019/03Gamma/gamma
+WorkspacePath          :=..
+ProjectPath            :=.
 IntermediateDirectory  :=./Release
 OutDir                 := $(IntermediateDirectory)
 CurrentFileName        :=
