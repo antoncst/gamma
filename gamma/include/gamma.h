@@ -2,34 +2,38 @@
 #define GAMMA_H_INCLUDED
 
 #include "platform.h"
+#include "randomroutines.h"
 
 #include <string>
 #include <fstream>
+#include <cstring>
 
 class GammaCrypt
 {
-    static const size_t block_size = 65536 ;
+    static const size_t block_size = 64 ;    // in bytes
     static const size_t quantum_size = sizeof ( unsigned) ; // block size of one calculating operation (probably 32 or 64 bit) 
                                             // размер блока одной вычислительной операции (наверняка 32 или 64 бита)
     static const size_t n_quantum = block_size / quantum_size ;
     typedef unsigned t_block[ n_quantum ] ;
-    typedef unsigned t_block_random[ n_quantum + 1 ] ;
-    
-    void GenerateRandom() ;
-    void TransformRandom() ;
-    void BitTransformRandom() ;
-    void Bit2TransformRandom() ;
-    void Bit4TransformRandom() ;
-    void ByteTransformRandom() ;
-    void WordTransformRandom() ;
-    void QuadTransformRandom() ;
-    bool OpenFiles() ;  // in and out files
+public:     // for random routines
+    typedef unsigned t_block_random[ n_quantum + 1 ] ; // to transform Random block it is required one quantum more (therefore "+1")
+
+private:    
+
+    bool OpenFiles() ;  // input and output files
+
+    //write header to outpuy file (i.e. Key) 
     void WriteHead() ;
-    void Crypt() ;
-    void CloseFiles() ;
+    //read header from input file
     void ReadHead() ;
+
+    // actually crypt algorythm
+    // called from Encrypt(), Decrypt()
+    void Crypt() ;
     
-    t_block_random m_block_random ;
+    void CloseFiles() ;
+    
+    t_block_random m_block_random ; 
     t_block m_block_password ;
     t_block m_block_source ;
     t_block m_block_dest ;
@@ -79,10 +83,10 @@ public:
         encrypt,
         decrypt
     } action ;
-    int password ; // 0 - password is not specified
-                         // otherwise number of argv
-    int infile ;
-    int outfile ;
+/*    int password ; // 0 - password is not specified
+*/                         // otherwise number of argv
+    int infile ;  // the index of the argv argument that points to the file name
+    int outfile ; // similarly
 
     void ParseCommandLine( int argc , char **argv ) ;
     

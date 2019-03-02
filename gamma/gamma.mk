@@ -13,7 +13,7 @@ CurrentFileName        :=
 CurrentFilePath        :=
 CurrentFileFullPath    :=
 User                   :=anton
-Date                   :=27/02/19
+Date                   :=02/03/19
 CodeLitePath           :=/home/anton/.codelite
 LinkerName             :=/usr/bin/g++
 SharedObjectLinkerName :=/usr/bin/g++ -shared -fPIC
@@ -60,7 +60,7 @@ AS       := /usr/bin/as
 ## User defined environment variables
 ##
 CodeLiteDir:=/usr/share/codelite
-Objects0=$(IntermediateDirectory)/main.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_display.cpp$(ObjectSuffix) 
+Objects0=$(IntermediateDirectory)/main.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_display.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_randomroutines.cpp$(ObjectSuffix) 
 
 
 
@@ -114,6 +114,14 @@ $(IntermediateDirectory)/src_display.cpp$(DependSuffix): src/display.cpp
 
 $(IntermediateDirectory)/src_display.cpp$(PreprocessSuffix): src/display.cpp
 	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/src_display.cpp$(PreprocessSuffix) src/display.cpp
+
+$(IntermediateDirectory)/src_randomroutines.cpp$(ObjectSuffix): src/randomroutines.cpp $(IntermediateDirectory)/src_randomroutines.cpp$(DependSuffix)
+	$(CXX) $(IncludePCH) $(SourceSwitch) "src/randomroutines.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_randomroutines.cpp$(ObjectSuffix) $(IncludePath)
+$(IntermediateDirectory)/src_randomroutines.cpp$(DependSuffix): src/randomroutines.cpp
+	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/src_randomroutines.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/src_randomroutines.cpp$(DependSuffix) -MM src/randomroutines.cpp
+
+$(IntermediateDirectory)/src_randomroutines.cpp$(PreprocessSuffix): src/randomroutines.cpp
+	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/src_randomroutines.cpp$(PreprocessSuffix) src/randomroutines.cpp
 
 
 -include $(IntermediateDirectory)/*$(DependSuffix)
