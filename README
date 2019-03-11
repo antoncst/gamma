@@ -1,7 +1,7 @@
 Gamma.
 File encryption utility.
 
-Developed in the Codelite IDE.
+Developed in the Codelite IDE. Complier g++ 7.3.0
 To make project use command
 make -j2 -e -f Makefile 
 
@@ -12,7 +12,7 @@ Algorithm designed by Sergey Scherbakov.
 Гамма.
 Утилита для шифрования файлов.
 
-Для разработки использовалась IDE Codelite.
+Для разработки использовалась IDE Codelite. Компилятор g++ 7.3.0
 Для сборки проекта используйте команду
 make -j2 -e -f Makefile 
 

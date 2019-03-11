@@ -4,8 +4,8 @@
 #include <stdlib.h>     /* srand, rand */
 #include <time.h>       /* time */
 
-#include <array> // for debug only
-#include <iostream>  // for debug only
+//#include <array> // for debug only
+//#include <iostream>  // for debug only
 
 #include "gamma.h"
 #include "display.h"
@@ -13,8 +13,8 @@
 using namespace std ;
 
 
-GammaCrypt::GammaCrypt( const string in_filename, const string out_filename, const string password ) 
-    : m_in_filename( in_filename) , m_out_filename( out_filename) , m_password( password )
+GammaCrypt::GammaCrypt( istream & ifs , ostream & ofs ,  const string & password ) 
+    : m_ifs( ifs ) , m_ofs( ofs ) , m_password( password )
 {
     memset( & m_block_password , 0 , block_size ) ;
     memcpy( & m_block_password , m_password.c_str(), m_password.length() ) ;
@@ -22,33 +22,17 @@ GammaCrypt::GammaCrypt( const string in_filename, const string out_filename, con
 
 void GammaCrypt::Encrypt()
 {
-    if ( !OpenFiles() ) 
-    {
-        CloseFiles() ; // because 'in' file can be opened, but 'out' is not opened
-        return;
-    }
-    
+
     GenerateRandom( m_block_random , n_quantum ) ;
     WriteHead() ;
     Crypt() ;
-    
-    CloseFiles() ;
     
 }
 
 void GammaCrypt::Decrypt()
 {
-    if ( !OpenFiles() ) 
-    {
-        CloseFiles() ; // because 'in' file can be opened, but 'out' is not opened
-        return;
-    }
-    
     ReadHead() ;
     Crypt() ;
-    
-    CloseFiles() ;
-    
 }
 
 void GammaCrypt::ReadHead()
@@ -70,8 +54,8 @@ void GammaCrypt::WriteHead()
 
 void GammaCrypt::Crypt()
 {
-    
-/*    // for debugging
+/*    
+    // for debugging
     std::array<t_block, 10000> v ;
     size_t n = 0 ;
     bool b_found = false ;
@@ -79,7 +63,6 @@ void GammaCrypt::Crypt()
     while ( ! m_ifs.eof() )
     {
         TransformRandom( m_block_password , n_quantum ) ;
-        //Bit4TransformRandom() ;
         
         m_ifs.read( (char*) m_block_source, block_size ) ;
         for ( unsigned i = 0 ; i < n_quantum ; i++ )
@@ -103,93 +86,4 @@ void GammaCrypt::Crypt()
         n++;
 */
     }
-}
-
-bool GammaCrypt::OpenFiles()
-{
-    m_ifs.open( m_in_filename.c_str() , ifstream::in | ifstream::binary ) ;
-    if ( ! m_ifs.is_open() )
-    {
-        display_err( " Error opening input file for reading" ) ;
-        return false ;
-    }
-
-    m_ofs.open( m_out_filename.c_str(), ifstream::out | ifstream::binary | ifstream::trunc ) ;
-
-    if ( ! m_ofs.is_open() )
-    {
-        display_err( " Error opening output file for writing" ) ;
-        return false ;
-    }
-
-    return true ;
-}
-
-void GammaCrypt::CloseFiles()
-{
-    if ( m_ifs.is_open() )
-        m_ifs.close() ;
-    if ( m_ofs.is_open() )
-        m_ofs.close() ;
-}
-
-void CmdLnParser::ParseCommandLine( int argc , char **argv )
-{
-    m_b_error = false ;
-    int arg_counter = 0;
-    
-    action = none ;
-    infile = 0 ;
-    outfile = 0 ;
-    
-    bool now_keys_coming = true ;
-    for ( int i = 1 ; i < argc ; i++ )
-    {
-        string s( argv[i] ) ;
-        if ( now_keys_coming )
-        {
-            if ( s[0] == '-')
-            {
-                if ( s == "-e" || s == "--encrypt" )
-                    if ( action == none )
-                        action = encrypt ;
-                    else
-                        { m_b_error = true ; break ; } 
-                else if ( s == "-d" || s == "--decrypt" )
-                    if ( action == none )
-                        action = decrypt ;
-                    else
-                        { m_b_error = true ; break ; } 
-                else if ( s == "-h" || s == "--help" )
-                    { m_b_error = true ; break ; } 
-                else
-                    { m_b_error = true ; break ; } 
-            }
-            else
-                now_keys_coming = false ;
-        }
-        if ( !now_keys_coming )
-        {
-            if ( s[0] == '-')
-                { m_b_error = true ; break ; } 
-            else
-            {
-                arg_counter++ ;
-                if ( arg_counter >2 )
-                    { m_b_error = true ; break ; } 
-                if ( arg_counter == 1 )
-                    infile = i ;
-                if ( arg_counter == 2 )
-                    outfile = i ;
-                    
-                
-            }
-        }
-    }
-    if ( m_b_error )
-        display_str( help_string ) ;
-    else
-        if ( action == none)
-            action = encrypt ;
-        
 }

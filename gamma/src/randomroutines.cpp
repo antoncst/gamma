@@ -90,8 +90,9 @@ void GenerateRandom( unsigned * block_random , const size_t n_quantum )
         if ( current_block_index >= n_quantum ) 
             break ;
     }
-    
-/*    
+    display_str("\nrandom generated") ;
+
+/*
     srand( 1 ) ; //time( NULL )
     for ( unsigned i=0 ; i < n_quantum  ; i++ ) 
     {
@@ -177,7 +178,7 @@ void TransformRandom( unsigned * block_random , const size_t n_quantum )
 }
 
 /*
-//repeat after 128 iterations
+//repeat after 128 iterations when block_size = 32 bytes
 void GammaCrypt::Bit2TransformRandom()
 {
     unsigned first_byte = m_block_random[0] & 0x3 ;
@@ -208,7 +209,7 @@ void GammaCrypt::Bit2TransformRandom()
 
 
 
-// repeat after 64
+// repeat after 64 when block_size = 32 bytes
 void GammaCrypt::Bit4TransformRandom()
 {
     unsigned first_byte = m_block_random[0] & 0xF ;
@@ -228,7 +229,7 @@ void GammaCrypt::Bit4TransformRandom()
 
 }
 
-// repeat after 32
+// repeat after 32 when block_size = 32 bytes
 void GammaCrypt::ByteTransformRandom()
 {
     unsigned first_byte = m_block_random[0] & 0xFF ;
@@ -244,7 +245,7 @@ void GammaCrypt::ByteTransformRandom()
 
 }
 
-// repeat after 16
+// repeat after 16 when block_size = 32 bytes
 void GammaCrypt::WordTransformRandom()
 {
     unsigned first_word = m_block_random[0] & 0xFFFF ;
@@ -258,7 +259,7 @@ void GammaCrypt::WordTransformRandom()
 
 }
 
-// repeat after 8
+// repeat after 8 when block_size = 32 bytes
 void GammaCrypt::QuadTransformRandom()
 {
     unsigned first_word = m_block_random[0] ;

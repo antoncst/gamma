@@ -5,16 +5,16 @@
 ## Release
 ProjectName            :=gamma
 ConfigurationName      :=Release
-WorkspacePath          :=..
-ProjectPath            :=.
+WorkspacePath          :=.
+ProjectPath            :=..
 IntermediateDirectory  :=./Release
 OutDir                 := $(IntermediateDirectory)
 CurrentFileName        :=
 CurrentFilePath        :=
 CurrentFileFullPath    :=
 User                   :=anton
-Date                   :=02/03/19
-CodeLitePath           :=/home/anton/.codelite
+Date                   :=11/03/19
+CodeLitePath           :=
 LinkerName             :=/usr/bin/g++
 SharedObjectLinkerName :=/usr/bin/g++ -shared -fPIC
 ObjectSuffix           :=.o
@@ -60,7 +60,7 @@ AS       := /usr/bin/as
 ## User defined environment variables
 ##
 CodeLiteDir:=/usr/share/codelite
-Objects0=$(IntermediateDirectory)/main.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_display.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_randomroutines.cpp$(ObjectSuffix) 
+Objects0=$(IntermediateDirectory)/main.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_display.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_randomroutines.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_helper.cpp$(ObjectSuffix) 
 
 
 
@@ -122,6 +122,14 @@ $(IntermediateDirectory)/src_randomroutines.cpp$(DependSuffix): src/randomroutin
 
 $(IntermediateDirectory)/src_randomroutines.cpp$(PreprocessSuffix): src/randomroutines.cpp
 	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/src_randomroutines.cpp$(PreprocessSuffix) src/randomroutines.cpp
+
+$(IntermediateDirectory)/src_helper.cpp$(ObjectSuffix): src/helper.cpp $(IntermediateDirectory)/src_helper.cpp$(DependSuffix)
+	$(CXX) $(IncludePCH) $(SourceSwitch) "src/helper.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_helper.cpp$(ObjectSuffix) $(IncludePath)
+$(IntermediateDirectory)/src_helper.cpp$(DependSuffix): src/helper.cpp
+	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/src_helper.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/src_helper.cpp$(DependSuffix) -MM src/helper.cpp
+
+$(IntermediateDirectory)/src_helper.cpp$(PreprocessSuffix): src/helper.cpp
+	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/src_helper.cpp$(PreprocessSuffix) src/helper.cpp
 
 
 -include $(IntermediateDirectory)/*$(DependSuffix)

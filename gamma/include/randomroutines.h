@@ -12,5 +12,5 @@ void GenerateRandom( unsigned * block_random , const size_t n_quantum ) ;
 //out:  m_block_random - transormed random
 void TransformRandom( unsigned * block_random , const size_t n_quantum ) ;
 
-void BitTransformRandom( unsigned * block_random , const size_t n_quantum ) ;
+void TransformRandomCycle( unsigned * block_random , const size_t n_quantum ) ;
 

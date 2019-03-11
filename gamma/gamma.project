@@ -7,11 +7,13 @@
     <File Name="src/gamma.cpp"/>
     <File Name="src/display.cpp"/>
     <File Name="src/randomroutines.cpp"/>
+    <File Name="src/helper.cpp"/>
   </VirtualDirectory>
   <VirtualDirectory Name="include">
     <File Name="include/display.h"/>
     <File Name="include/gamma.h"/>
     <File Name="include/randomroutines.h"/>
+    <File Name="include/helper.h"/>
   </VirtualDirectory>
   <Settings Type="Executable">
     <GlobalSettings>
