@@ -62,7 +62,7 @@ void GammaCrypt::Crypt()
 */    
     while ( ! m_ifs.eof() )
     {
-        TransformRandom( m_block_password , n_quantum ) ;
+        TransformRandom( m_block_random , n_quantum ) ;
         
         m_ifs.read( (char*) m_block_source, block_size ) ;
         for ( unsigned i = 0 ; i < n_quantum ; i++ )

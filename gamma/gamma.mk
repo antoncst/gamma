@@ -5,16 +5,16 @@
 ## Release
 ProjectName            :=gamma
 ConfigurationName      :=Release
-WorkspacePath          :=.
-ProjectPath            :=..
+WorkspacePath          :=/home/anton/1/cpp/2019/03Gamma
+ProjectPath            :=/home/anton/1/cpp/2019/03Gamma/gamma
 IntermediateDirectory  :=./Release
 OutDir                 := $(IntermediateDirectory)
 CurrentFileName        :=
 CurrentFilePath        :=
 CurrentFileFullPath    :=
 User                   :=anton
-Date                   :=11/03/19
-CodeLitePath           :=
+Date                   :=12/03/19
+CodeLitePath           :=/home/anton/.codelite
 LinkerName             :=/usr/bin/g++
 SharedObjectLinkerName :=/usr/bin/g++ -shared -fPIC
 ObjectSuffix           :=.o
@@ -92,7 +92,7 @@ PreBuild:
 ## Objects
 ##
 $(IntermediateDirectory)/main.cpp$(ObjectSuffix): main.cpp $(IntermediateDirectory)/main.cpp$(DependSuffix)
-	$(CXX) $(IncludePCH) $(SourceSwitch) "main.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/main.cpp$(ObjectSuffix) $(IncludePath)
+	$(CXX) $(IncludePCH) $(SourceSwitch) "/home/anton/1/cpp/2019/03Gamma/gamma/main.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/main.cpp$(ObjectSuffix) $(IncludePath)
 $(IntermediateDirectory)/main.cpp$(DependSuffix): main.cpp
 	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/main.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/main.cpp$(DependSuffix) -MM main.cpp
 
@@ -100,7 +100,7 @@ $(IntermediateDirectory)/main.cpp$(PreprocessSuffix): main.cpp
 	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/main.cpp$(PreprocessSuffix) main.cpp
 
 $(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix): src/gamma.cpp $(IntermediateDirectory)/src_gamma.cpp$(DependSuffix)
-	$(CXX) $(IncludePCH) $(SourceSwitch) "src/gamma.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix) $(IncludePath)
+	$(CXX) $(IncludePCH) $(SourceSwitch) "/home/anton/1/cpp/2019/03Gamma/gamma/src/gamma.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix) $(IncludePath)
 $(IntermediateDirectory)/src_gamma.cpp$(DependSuffix): src/gamma.cpp
 	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/src_gamma.cpp$(DependSuffix) -MM src/gamma.cpp
 
@@ -108,7 +108,7 @@ $(IntermediateDirectory)/src_gamma.cpp$(PreprocessSuffix): src/gamma.cpp
 	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/src_gamma.cpp$(PreprocessSuffix) src/gamma.cpp
 
 $(IntermediateDirectory)/src_display.cpp$(ObjectSuffix): src/display.cpp $(IntermediateDirectory)/src_display.cpp$(DependSuffix)
-	$(CXX) $(IncludePCH) $(SourceSwitch) "src/display.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_display.cpp$(ObjectSuffix) $(IncludePath)
+	$(CXX) $(IncludePCH) $(SourceSwitch) "/home/anton/1/cpp/2019/03Gamma/gamma/src/display.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_display.cpp$(ObjectSuffix) $(IncludePath)
 $(IntermediateDirectory)/src_display.cpp$(DependSuffix): src/display.cpp
 	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/src_display.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/src_display.cpp$(DependSuffix) -MM src/display.cpp
 
@@ -116,7 +116,7 @@ $(IntermediateDirectory)/src_display.cpp$(PreprocessSuffix): src/display.cpp
 	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/src_display.cpp$(PreprocessSuffix) src/display.cpp
 
 $(IntermediateDirectory)/src_randomroutines.cpp$(ObjectSuffix): src/randomroutines.cpp $(IntermediateDirectory)/src_randomroutines.cpp$(DependSuffix)
-	$(CXX) $(IncludePCH) $(SourceSwitch) "src/randomroutines.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_randomroutines.cpp$(ObjectSuffix) $(IncludePath)
+	$(CXX) $(IncludePCH) $(SourceSwitch) "/home/anton/1/cpp/2019/03Gamma/gamma/src/randomroutines.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_randomroutines.cpp$(ObjectSuffix) $(IncludePath)
 $(IntermediateDirectory)/src_randomroutines.cpp$(DependSuffix): src/randomroutines.cpp
 	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/src_randomroutines.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/src_randomroutines.cpp$(DependSuffix) -MM src/randomroutines.cpp
 
@@ -124,7 +124,7 @@ $(IntermediateDirectory)/src_randomroutines.cpp$(PreprocessSuffix): src/randomro
 	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/src_randomroutines.cpp$(PreprocessSuffix) src/randomroutines.cpp
 
 $(IntermediateDirectory)/src_helper.cpp$(ObjectSuffix): src/helper.cpp $(IntermediateDirectory)/src_helper.cpp$(DependSuffix)
-	$(CXX) $(IncludePCH) $(SourceSwitch) "src/helper.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_helper.cpp$(ObjectSuffix) $(IncludePath)
+	$(CXX) $(IncludePCH) $(SourceSwitch) "/home/anton/1/cpp/2019/03Gamma/gamma/src/helper.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_helper.cpp$(ObjectSuffix) $(IncludePath)
 $(IntermediateDirectory)/src_helper.cpp$(DependSuffix): src/helper.cpp
 	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/src_helper.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/src_helper.cpp$(DependSuffix) -MM src/helper.cpp
 
