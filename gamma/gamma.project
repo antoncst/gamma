@@ -1,19 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CodeLite_Project Name="gamma" Version="10.0.0" InternalType="Console">
+  <Plugins>
+    <Plugin Name="qmake">
+      <![CDATA[00010001N0005Debug000000000000]]>
+    </Plugin>
+  </Plugins>
   <Description/>
   <Dependencies/>
   <VirtualDirectory Name="src">
     <File Name="main.cpp"/>
     <File Name="src/gamma.cpp"/>
-    <File Name="src/display.cpp"/>
     <File Name="src/randomroutines.cpp"/>
     <File Name="src/helper.cpp"/>
+    <File Name="../Display/ConsoleDisplay/src/display.cpp"/>
   </VirtualDirectory>
   <VirtualDirectory Name="include">
-    <File Name="include/display.h"/>
     <File Name="include/gamma.h"/>
     <File Name="include/randomroutines.h"/>
     <File Name="include/helper.h"/>
+    <File Name="../Display/ConsoleDisplay/include/display.h"/>
   </VirtualDirectory>
   <Settings Type="Executable">
     <GlobalSettings>
@@ -29,6 +34,7 @@
       <Compiler Options="-g;-O0;-std=c++14;-Wall" C_Options="-g;-O0;-Wall" Assembler="" Required="yes" PreCompiledHeader="" PCHInCommandLine="no" PCHFlags="" PCHFlagsPolicy="0">
         <IncludePath Value="."/>
         <IncludePath Value="./include"/>
+        <Preprocessor Value="DEBUG"/>
       </Compiler>
       <Linker Options="" Required="yes"/>
       <ResourceCompiler Options="" Required="no"/>

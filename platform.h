@@ -1,0 +1,2 @@
+#define LINUX
+//#define WINDOWS

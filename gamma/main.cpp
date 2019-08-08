@@ -5,8 +5,9 @@
 #include <cassert>
 
 #include "gamma.h"
-#include "display.h"
+#include "../../Display/ConsoleDisplay/include/display.h"
 #include "helper.h"
+#include <cstdio>
 
 using namespace std ;
 
@@ -27,9 +28,16 @@ int main(int argc, char **argv)
     
 	//bool psw_input_twice ;
 
-    
-    if ( ! OpenFiles( in_filename , out_filename , ifs , ofs ) )
+    try
+    {
+        OpenFiles( in_filename , out_filename , ifs , ofs ) ;
+    }
+    catch ( const char * s )
+    {
+        display_err( s ) ;
         return 3 ;
+    }
+    
     
     string password ;
     password = "1234567890AB" ;
@@ -42,13 +50,26 @@ int main(int argc, char **argv)
 
     GammaCrypt gm( ifs , ofs , password ) ;
 
-    if ( parser.action == parser.none || parser.action == parser.encrypt )
-        gm.Encrypt() ;
-    else
-        gm.Decrypt() ;
+    try 
+    {
+        if ( parser.action == parser.none || parser.action == parser.encrypt )
+            gm.Encrypt() ;
+        else
+            gm.Decrypt() ;
+    }
+    catch( const char * s) 
+    {
+        display_err( string( s ) ) ;
+        return 1 ;
+    }
         
     ifs.close() ;
     ofs.close() ;
+    
+    #ifdef DEBUG
+        std::cout << " Press Enter" << std::endl ;
+        getchar() ;
+    #endif
     
     return 0;
 }

@@ -1,110 +1,237 @@
 
-#include "platform.h"
+#include "../platform.h"
 #include "randomroutines.h"
-#include "display.h"
+#include "../Display/ConsoleDisplay/include/display.h"
 
 #include <chrono>
 #include <cstring>
+#include <cassert>
+#include <exception>
+#include <algorithm>
+#include <memory>
+#include <fstream>
+#include <iostream>
+#include <deque>
+#include <vector>
 
-#ifdef GAMMA_WINDOWS
-#include <conio.h>
-#include <windows.h>
-#endif
+#include <thread> //for sleep
 
-#ifdef GAMMA_LINUX
-#include <unistd.h>
-#include <termios.h>
 
-int getch()
+//---------------------------------------------------------------------
+//GENERATING RANDOM
+
+// отклонение от идеально равномерного распределения, процентов
+const unsigned deviation = 25 ;
+
+// make statistics distribution (статистическое распределение) lower two bits (shifting left on nshift bits)
+// if distribution is even (равномерное, допускаю отклонение в deviation % ) returns true
+// N - размер массива
+// nshift - начиная от какого (с младшей стороны) бита брать 4 бита
+bool MakeDistrbution_4lowbits( unsigned const N , t_block const rvals , unsigned nshift )
 {
-    int ch;
-    struct termios oldt, newt;
-    tcgetattr( STDIN_FILENO, &oldt );
-    newt = oldt;
-    newt.c_lflag &= ~( ICANON | ECHO );
-    tcsetattr( STDIN_FILENO, TCSANOW, &newt );
-    ch = getchar();
-    tcsetattr( STDIN_FILENO, TCSANOW, &oldt );
-    return ch;
-}
-#endif
+    const size_t dsize = 16 ;
+    unsigned dvals[ dsize ] ;
+    for ( unsigned i = 0 ; i < dsize ; i++ )
+        dvals[i] = 0 ;
 
-
-void GenerateRandom( unsigned * block_random , const size_t n_quantum )
-{
-    memset ( block_random , 0 , (n_quantum + 1) * sizeof( unsigned) ) ;
+    unsigned umask = 0xf ;
+    umask <<= nshift ;
     
-    display_str( "Type any text. This is required for strong encryption" ) ;
-    
-    size_t current_bit_offset = 0 ;
-    size_t current_block_index = 0 ;
-    
-    #ifdef GAMMA_LINUX
-    const int n_bit_used = 23 ;
-    const unsigned mask = 0x7FFFFF ;
-    auto mcs1 = std::chrono::high_resolution_clock::now() ;
-    #endif
-
-    #ifdef GAMMA_WINDOWS
-    const int n_bit_used = 14 ;
-    const unsigned mask = 0x3FFF ;
-    LARGE_INTEGER mcs1 , mcs2 ;
-    ::QueryPerformanceCounter( &mcs1 ) ;
-    #endif
-
-    while ( 1 )
+    for ( unsigned i = 0 ; i < N ; i++ )
     {
+        unsigned index = rvals[ i ]  & umask ;
+        index >>= nshift ;
+        dvals[ index ] ++ ;
+    }
+    
+    #ifdef DEBUG
+    std::cout << "bit" << nshift << std::endl ;
+    std::cout << "statistics:\n" ;
+    for ( auto dval : dvals )
+        std::cout << dval << std::endl ;
+    #endif
+  
+    for ( auto dval : dvals )
+        if ( dval < N * ( 100 - deviation ) / 100 / dsize  ||  dval > N * ( 100 + deviation ) / 100 / dsize  )
+            return false ;
 
-        int ch = getch() ;
-        putchar ( ch );
+    return true ;
+}
 
-        #ifdef GAMMA_LINUX
+//generate randoms using hdd operatios
+// N - array size // размер массива
+void GenRandByHdd( unsigned const N , t_block rvals )
+{
+    //rarray_t rvals ;
+    auto mcs1 = std::chrono::high_resolution_clock::now() ;
+    for ( unsigned i = 0 ; i < N/2 ; ++i )
+    {
+        
+        std::ofstream ofs ;
+        ofs.open( "/home/anton/ramdisk/temp_1", std::ios::out | std::ios::trunc) ;
+        ofs << "ttt" ;
+        std::this_thread::sleep_for( std::chrono::microseconds( 10 ) ) ;
+        ofs.flush() ;
+        ofs.close() ;
+        
         auto mcs2 = std::chrono::high_resolution_clock::now() ;
         std::chrono::duration<double> mcs = mcs2 - mcs1 ;
+        mcs1 = mcs2 ;
         uint64_t rval ; //random value
         rval = mcs.count() * 1000000000 ;
-        #endif
         
-        #ifdef GAMMA_WINDOWS
-        ::QueryPerformanceCounter( &mcs2 ) ;
-        uint64_t rval = mcs2.QuadPart - mcs1.QuadPart ;
-        #endif
-        
-        if ( rval <= mask ) // i.e. time interval is too short
+        rvals[ i*2 ] = rval ;
+
+        {
+            std::ofstream ofs2 ;
+            ofs2.open( "/home/anton/ramdisk/temp_2", std::ios::out | std::ios::trunc) ;
+            ofs2 << "ttt" ;
+            std::this_thread::sleep_for( std::chrono::microseconds( 10 ) ) ;
+            ofs2.flush() ;
+            ofs2.close() ;
+
+            mcs2 = std::chrono::high_resolution_clock::now() ;
+            mcs = mcs2 - mcs1 ;
+            mcs1 = mcs2 ;
+            rval = mcs.count() * 1000000000 ;
+            
+            rvals[ i*2 +1 ] = rval ;
+        }
+    }
+}
+
+
+// определить старший, установленный в 1, бит
+int DetermineHighSetBit( unsigned const val )
+{
+    if ( val > 0 )
+    {
+                                      // 31                             8 7  4    0
+        unsigned umask = 0x80000000 ; //  1000 0000 0000 0000   0000 0000 0000 0000
+        int n = 31 ;
+        for ( n = 31 ; n >= 0 ; n-- , umask >>= 1 )
+            if ( (val & umask) > 0 )
+                return n ;
+    }
+    throw "error: too small random value to processing DetermineHighSetBit" ;
+}
+
+// Вычислить не среднее арифметическое, а "четверть арифметическое", то есть среднее африфметическое пополам
+unsigned CalcQuadAverage( unsigned const N , t_block const rvals )
+{
+    unsigned result = 0 ;
+    for ( unsigned i = 0 ; i < N ; ++i )
+    {
+        result += rvals[ i ] ;
+    }
+    return result / N / 2 ;
+}
+
+//Определить количество младших незначащих битов
+//Возвращает номер (считая от нуля) первого значащего бита
+//возвращает -1, если вообще не получились случайные числа
+int DetermineNonsignificantLowBits( unsigned const N , t_block const rvals )
+{
+    int HighSetBit = DetermineHighSetBit( CalcQuadAverage( N , rvals ) ) ;
+    if ( HighSetBit < 1 )  // как минимум д.б. 2 значимых бита
+        throw "error: too small random value to processing DetermineNonsignificantLowBits" ;
+    int i = 0 ;
+    for ( i = 0 ; i < HighSetBit ; i++ )
+        if ( MakeDistrbution_4lowbits( N , rvals , i ) == 1 )
+            return i ;
+    throw "error: fail to make statistic distribution" ;
+}
+
+void CropRandoms( unsigned const N , t_block rvals )
+{
+    // вычтем минимальное время, чтобы получилось отклонение.
+    unsigned * pmin = std::min_element( rvals , rvals + N ) ;
+    for ( unsigned i = 0 ; i < N ; i++ )
+    {
+        rvals[ i ] -= * pmin ;
+    }
+
+    //уберём младшие "малозначащие" биты
+    unsigned LowSignificantBit = DetermineNonsignificantLowBits( N ,rvals ) ;
+    for ( unsigned i = 0 ; i < N ; i++ )
+    {
+        rvals[ i ] >>= LowSignificantBit ;
+    }
+}
+
+// Взять из полученных случайных всё полезное и сформировать непрерывную кнаку
+// Возвращает длину кнаки в словах (unsigned)
+unsigned CompoundContiguousRandoms( unsigned const rsize , t_block block , unsigned const N , t_block const rvals )
+{
+    unsigned current_bit_offset = 0 ;
+    unsigned current_block_index = 0 ;
+    
+    for ( unsigned i = 0 ; i < N ; ++i )
+    {
+        if ( rvals[ i ] < 2 ) // тогда и брать нечего
             continue ;
-        rval &= mask ;
-        mcs1 = mcs2 ;
+        int rsize_bits = DetermineHighSetBit( rvals[ i ] ) ;
         
-        rval = rval << current_bit_offset ;
+        uint64_t rval = rvals[i] ;
+        uint64_t umask = ~ ( 1 << rsize_bits ) ;
+        rval &= umask ;
+        rsize_bits-- ; // т.к. сбросили старшую единицу
+        rval = rval << current_bit_offset ; //сдвигаю влево, может логичнее было бы двигать вправо, но т.к. у нас ГСЧ, то значения никакого не имеет
         
-        *( block_random + current_block_index ) |=  rval & 0xFFFFFFFF ;
-        if ( current_bit_offset > 31 - n_bit_used ) // got out for 32 bits / вылез за 32 бита
-            * (block_random + current_block_index +1 ) |= ( rval >> 32 ) ;
+        block[ current_block_index ] |=  rval & 0xFFFFFFFF ;
+        if ( current_bit_offset + rsize_bits > 31 ) // got out of 32 bits / вылез за 32 бита
+        {
+            if ( current_block_index + 1 > rsize )
+                break ;
+            else
+                block[ current_block_index +1 ] |= ( rval >> 32 ) ;
+        }
         
-        current_bit_offset += n_bit_used ;
+        current_bit_offset += rsize_bits ;
         if ( current_bit_offset > 31 )
         {
             current_bit_offset -= 32 ;
             current_block_index++ ;
         }
-        if ( current_block_index >= n_quantum ) 
+        if ( current_block_index + 1 > rsize )
             break ;
     }
-    display_str("\nrandom generated") ;
-
-/*
-    srand( 1 ) ; //time( NULL )
-    for ( unsigned i=0 ; i < n_quantum  ; i++ ) 
-    {
-        unsigned val = rand() ;// + (rand() << 15 ) + ( (rand() && 0x3) << 30 ) ;
-        *( block_random + i ) = val ;
-    }
-*/
+    
+    return current_block_index ;
 }
+
+//Генерировать блок СЧ заданной длины в словах (unsigned)
+//rsize (random block size) - размер массива
+void GenerateRandoms( unsigned const rsize , t_block randoms )
+{
+    unsigned alignedsize = 192 ; // минимальный размер массива для ГСЧ
+    if ( alignedsize < rsize)
+        alignedsize = rsize ; 
+    unsigned N = alignedsize * 4 ;
+    while ( 1 )
+    {
+        auto rvals = std::make_unique< t_block >( N ) ;
+        GenRandByHdd( N , rvals.get() ) ;
+        CropRandoms( N ,rvals.get() ) ;
+        unsigned received_rsize = CompoundContiguousRandoms( rsize , randoms , N , rvals.get() ) ;
+        if ( received_rsize == rsize ) 
+            break;
+        N *= 2 ;
+        display_str( "Too few random data, starting new cycle of generating..." ) ;
+        // Ну уж слишком много тоже нельзя:
+        if ( N > 1024*1024 ) // это как никак минимум 4 мегабайта
+            throw( "error: fail to compound randoms, too big array" ) ;
+    }
+    
+}
+
+//END OF GENERATING RANDOM
+//-----------------------------------------------
 
 
 void TransformRandomCycle( unsigned * block_random , const size_t n_quantum )
 {
+        assert( block_random != nullptr ) ;
     unsigned first_bit = *block_random & 0x1 ;
 
     for ( size_t i = 0 ; i < n_quantum ; i++ )
@@ -119,12 +246,13 @@ void TransformRandomCycle( unsigned * block_random , const size_t n_quantum )
         if ( i != n_quantum -1 )
             *(block_random+i) = (( *(block_random+i) & 0x80000000 ) ^ (( *(block_random+i+1) & 0x1 ) << 31 )) | ( *(block_random+i) & 0x7FFFFFFF ) ;
     }
-    *(block_random+n_quantum -1) = (( *(block_random+n_quantum -1) & 0x80000000 ) ^ ( first_bit << 31 )) | ( *(block_random+n_quantum -1) & 0x7FFFFFFF ) ;
+    *( block_random + n_quantum -1 ) = (( *(block_random + n_quantum -1) & 0x80000000 ) ^ ( first_bit << 31 )) | ( *(block_random+n_quantum -1) & 0x7FFFFFFF ) ;
 }
 
 
 void TransformRandom( unsigned * block_random , const size_t n_quantum )
 {
+        assert( block_random != nullptr ) ;
     unsigned first_bit = block_random[0] & 0x1 ;
 
     for ( size_t i = 0 ; i < n_quantum ; i++ )
@@ -177,98 +305,246 @@ void TransformRandom( unsigned * block_random , const size_t n_quantum )
     block_random[n_quantum -1] = ((block_random[n_quantum -1] & 0x80000000 ) ^ ( first_bit <<31 )) | ( block_random[n_quantum -1] & 0x7FFFFFFF ) ;
 }
 
-/*
-//repeat after 128 iterations when block_size = 32 bytes
-void GammaCrypt::Bit2TransformRandom()
-{
-    unsigned first_byte = m_block_random[0] & 0x3 ;
-    for ( size_t i = 0 ; i < n_quantum ; i++ )
-    {
-        m_block_random[i] = ( ( m_block_random[i] & 0x3) ^ (( m_block_random[i] & 0xC) >>2 ) ) | ( m_block_random[i] &        0xFFFFFFFC ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0xC) ^ (( m_block_random[i] & 0x30) >>2 ) ) | ( m_block_random[i] &       0xFFFFFFF3 ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0x30) ^ (( m_block_random[i] & 0xC0) >>2 ) ) | ( m_block_random[i] &      0xFFFFFFCF ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0xC0) ^ (( m_block_random[i] & 0x300) >>2 ) ) | ( m_block_random[i] &     0xFFFFFF3F ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0x300) ^ (( m_block_random[i] & 0xC00) >>2 ) ) | ( m_block_random[i] &    0xFFFFFCFF ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0xC00) ^ (( m_block_random[i] & 0x3000) >>2 ) ) | ( m_block_random[i] &   0xFFFFF3FF ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0x3000) ^ (( m_block_random[i] & 0xC000) >>2 ) ) | ( m_block_random[i] &  0xFFFFCFFF ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0xC000) ^ (( m_block_random[i] & 0x30000) >>2 ) ) | ( m_block_random[i] & 0xFFFF3FFF ) ;
 
-        m_block_random[i] = ( ( m_block_random[i] & 0x30000) ^ (( m_block_random[i] &    0xC0000) >>2 ) ) | ( m_block_random[i] &     0xFFFCFFFF ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0xC0000) ^ (( m_block_random[i] &    0x300000) >>2 ) ) | ( m_block_random[i] &    0xFFF3FFFF ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0x300000) ^ (( m_block_random[i] &   0xC00000) >>2 ) ) | ( m_block_random[i] &    0xFFCFFFFF ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0xC00000) ^ (( m_block_random[i] &   0x3000000) >>2 ) ) | ( m_block_random[i] &   0xFF3FFFFF ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0x3000000) ^ (( m_block_random[i] &  0xC000000) >>2 ) ) | ( m_block_random[i] &   0xFCFFFFFF ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0xC000000) ^ (( m_block_random[i] &  0x30000000) >>2 ) ) | ( m_block_random[i] &  0xF3FFFFFF ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0x30000000) ^ (( m_block_random[i] & 0xC0000000) >>2 ) ) | ( m_block_random[i] &  0xCFFFFFFF ) ;
-        if ( i != n_quantum -1 )
-            m_block_random[i] = ( ( m_block_random[i] & 0xC0000000) ^ (( m_block_random[i+1] & 0x3) <<30 ) ) | ( m_block_random[i] & 0x3FFFFFFF ) ;
-    }
-    m_block_random[n_quantum -1] = ( ( m_block_random[n_quantum -1] & 0xC0000000) ^ first_byte <<30) | ( m_block_random[n_quantum -1] & 0x3FFFFFFF ) ;
+//------------- REPOSITIONING --------------------
+
+
+void BitsetItmesArray::Init( size_t block_size )
+{
+    block_size_bytes = block_size ;
+    // есть блок размером m_block_size байт
+    //допустим переставляем биты, тогда нужно адресовать :
+    max_index = block_size_bytes * 8 ;
+    // Для хранения одного индекса нужно log2 ( m_max_index ) бит ;
+    uint16_t temp = max_index ;
+    index_size_bits = 0 ; 
+    while ( temp >>= 1 ) index_size_bits ++ ;
+    // Для хранения всех индексов нужно
+    matrix_size_bits = max_index * index_size_bits ;
+    matrix_size_bytes = matrix_size_bits / 8 ;
+    if ( matrix_size_bits % 8 != 0 ) // это вряд ли, но на всякий случай
+        matrix_size_bytes++ ;
+        
+    // выделим память и инициализируем BitArray
+    m_array = std::make_unique<unsigned char[]>( matrix_size_bytes ) ;
+
+    m_matrixBA.Init( m_array.get() ) ;
 
 }
 
-
-
-// repeat after 64 when block_size = 32 bytes
-void GammaCrypt::Bit4TransformRandom()
+void BitsetItmesArray::InverseRearrangeMatrix()
 {
-    unsigned first_byte = m_block_random[0] & 0xF ;
-    for ( size_t i = 0 ; i < n_quantum ; i++ )
+    //std::vector< uint16_t > inverse_matrix ;
+    BitsetItmesArray inverse_matrix ;
+    inverse_matrix.Init( block_size_bytes  ) ;
+    
+    //inverse_matrix.reserve( max_index ) ;
+    for ( unsigned i = 0 ; i < max_index ;  ++i )
     {
-        m_block_random[i] = ( ( m_block_random[i] & 0xF) ^ (( m_block_random[i] & 0xF0) >>4 ) ) | ( m_block_random[i] & 0xFFFFFFF0 ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0xF0) ^ (( m_block_random[i] & 0xF00) >>4 ) ) | ( m_block_random[i] & 0xFFFFFF0F ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0xF00) ^ (( m_block_random[i] & 0xF000) >>4 ) ) | ( m_block_random[i] & 0xFFFFF0FF ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0xF000) ^ (( m_block_random[i] & 0xF0000) >>4 ) ) | ( m_block_random[i] & 0xFFFF0FFF ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0xF0000) ^ (( m_block_random[i] & 0xF00000) >>4 ) ) | ( m_block_random[i] & 0xFFF0FFFF ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0xF00000) ^ (( m_block_random[i] & 0xF000000) >>4 ) ) | ( m_block_random[i] & 0xFF0FFFFF ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0xF000000) ^ (( m_block_random[i] & 0xF0000000) >>4 ) ) | ( m_block_random[i] & 0xF0FFFFFF ) ;
-        if ( i != n_quantum -1 )
-            m_block_random[i] = ( ( m_block_random[i] & 0xF0000000) ^ (( m_block_random[i+1] & 0xF) <<28 ) ) | ( m_block_random[i] & 0x0FFFFFFF ) ;
+        inverse_matrix.set( this->operator []( i ) , i ) ;
     }
-    m_block_random[n_quantum -1] = ( ( m_block_random[n_quantum -1] & 0xF0000000) ^ (first_byte <<28 ) ) | ( m_block_random[n_quantum-1] & 0x0FFFFFFF ) ;
+    memcpy( m_array.get() , inverse_matrix.m_array.get() , matrix_size_bytes ) ;
+} ;
 
+void BitsetItmesArray::MakeRearrangeMatrix()
+{
+    //сгенерируем  список индексов
+    std::deque< uint16_t > indexes_deque( max_index ) ;
+    for ( uint16_t i = 0 ; i < max_index ; ++i )
+        indexes_deque[i] = i  ;
+    // комментарий для uint16,  устаревший :
+    // так, нам нужно рандомов в общем столько же, сколько max_index.
+    // значит нужно max_index * sizeof( uint16 ) байт.
+    // GenetateRandom гененирует в unsigned (4 байта)
+    // 
+    // для заданного размера индека index_size_bits
+    // GenetateRandom гененирует в unsigned (4 байта)
+    // нужно matrix_size_bytes / 4 + 1
+    
+    unsigned N = matrix_size_bytes / 4 ;
+    if ( matrix_size_bytes % 4 > 0 )
+        N ++ ;
+    auto rands = std::make_unique< t_block >( N ) ;
+    //unsigned * rands = new unsigned[ N ] ;
+    //display_str("Generating randoms for matrix ...") ;
+    GenerateRandoms( N , rands.get() ) ;
+    
+    BitsetItmesArray BI_rands ;
+    //auto BI_rands = std::make_unique<t_block>( N ) ;
+    BI_rands.Init( block_size_bytes ) ;
+    BI_rands.m_array.reset( reinterpret_cast< std::unique_ptr<unsigned char []>::pointer > ( std::move(rands).get() )  )  ;
+    BI_rands.m_matrixBA.Init( BI_rands.m_array.get() ) ;
+    //BI_rands = std::move(  rands  ) ;
+    
+    //display_str("making matrix...") ;
+    for ( unsigned i = 0 ; i < max_index ; ++i )
+    {
+        // вместо rands - unique_ptr< t_block > 
+        // нужен BitsetItmesArray
+        
+        uint16_t r = BI_rands[ i ] ;
+        /*if ( i % 2 == 0)
+            r = rands [ i/2 ] & 0xffff ;
+        else
+            r = rands[ i/2 ] >> 16 ; */
+        
+        uint16_t rr = ( r % ( max_index - i ) ) ;
+        // m_array[ i ] =  indexes_deque[ rr ] ; // 
+        set( i , indexes_deque[ rr] ) ;
+        //this->operator []()
+        //repostn_matrix[ i ] = indexes[ rr ] ;
+        indexes_deque.erase( indexes_deque.begin() + rr ) ;
+    }
+    rands.reset( reinterpret_cast< std::unique_ptr< t_block >::pointer > ( std::move(BI_rands.m_array).get() )  )  ;
+
+} ;
+
+void BitsetItmesArray::Rearrange( unsigned char * p_block , uint16_t bytes_read )
+{
+    
+    if ( bytes_read < block_size_bytes )
+    {
+        // тогда остаток блока надо добить нулями
+        memset( p_block + bytes_read, 0 , block_size_bytes - bytes_read ) ;
+    }
+    
+    auto res_block = std::make_unique< unsigned char[]  >( block_size_bytes ) ;
+    memset( res_block.get() , 0 , block_size_bytes ) ;
+
+    BitArray src_BA( p_block ) ;
+    BitArray res_BA( res_block.get() ) ;
+    
+    for ( uint16_t i = 0 ; i < max_index ; ++i )
+    {
+        //uint16_t byte_offset_src = repostn_matrix[ i ] / 8 ;
+        //uint16_t bit_offset_src = repostn_matrix[ i ] % 8 ;
+        
+        //uint16_t byte_offset_res = i / 8 ;
+        //uint16_t bit_offset_res = i % 8 ;
+        
+        //char mask_src = 1 << bit_offset_src ;
+        
+        //bool res_bit = p_block[byte_offset_src] & mask_src ;
+        //char mask_res = char ( res_bit ) << bit_offset_res ;
+        
+        //res_block[ byte_offset_res ] |= mask_res ;
+        //res_BA.setbit( i , src_BA[ m_array[ i ] ] ) ;
+        res_BA.setbit( i , src_BA[ this->operator []( i ) ] ) ;
+    }
+    memcpy(  p_block , res_block.get() , block_size_bytes ) ; //todo realize move semantic
+    
 }
 
-// repeat after 32 when block_size = 32 bytes
-void GammaCrypt::ByteTransformRandom()
+uint16_t BitsetItmesArray::operator []( uint16_t index )
 {
-    unsigned first_byte = m_block_random[0] & 0xFF ;
-    for ( size_t i = 0 ; i < n_quantum ; i++ )
-    {
-        m_block_random[i] = ( ( m_block_random[i] & 0xFF) ^ (( m_block_random[i] & 0xFF00) >>8 ) ) | ( m_block_random[i] & 0xFFFFFF00 ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0xFF00) ^ (( m_block_random[i] & 0xFF0000) >>8 ) ) | ( m_block_random[i] & 0xFFFF00FF ) ;
-        m_block_random[i] = ( ( m_block_random[i] & 0xFF0000) ^ (( m_block_random[i] & 0xFF000000) >>8 ) ) | ( m_block_random[i] & 0xFF00FFFF ) ;
-        if ( i != n_quantum -1 )
-            m_block_random[i] = ((m_block_random[i] & 0xFF000000 ) ^ (( m_block_random[i+1] & 0xFF ) << 24 )) | ( m_block_random[i] & 0x00FFFFFF ) ;
-    }
-    m_block_random[n_quantum -1] = ((m_block_random[n_quantum -1] & 0xFF000000 ) ^ (( first_byte ) << 24)) | ( m_block_random[n_quantum -1] & 0x00FFFFFF ) ;
-
+    return m_matrixBA.get( index * index_size_bits , index_size_bits ) ;
 }
 
-// repeat after 16 when block_size = 32 bytes
-void GammaCrypt::WordTransformRandom()
+void BitsetItmesArray::set( uint16_t index , uint16_t val ) 
 {
-    unsigned first_word = m_block_random[0] & 0xFFFF ;
-    for ( size_t i = 0 ; i < n_quantum ; i++ )
-    {
-        m_block_random[i] = ( ( m_block_random[i] & 0xFFFF) ^ (( m_block_random[i] & 0xFFFF0000) >>16 ) ) | ( m_block_random[i] & 0xFFFF0000 ) ;
-        if ( i != n_quantum -1 )
-            m_block_random[i] = ((m_block_random[i] & 0xFFFF0000 ) ^ (( m_block_random[i+1] & 0xFFFF ) << 16)) | ( m_block_random[i] & 0x0000FFFF ) ;
-    }
-    m_block_random[n_quantum -1] = ((m_block_random[n_quantum -1] & 0xFFFF0000 ) ^ (( first_word ) << 16)) | ( m_block_random[n_quantum -1] & 0x0000FFFF ) ;
-
+    m_matrixBA.set( index * index_size_bits , index_size_bits , val ) ;
 }
 
-// repeat after 8 when block_size = 32 bytes
-void GammaCrypt::QuadTransformRandom()
-{
-    unsigned first_word = m_block_random[0] ;
-    for ( size_t i = 0 ; i < n_quantum ; i++ )
-    {
-        if ( i != n_quantum -1 )
-            m_block_random[i] = (m_block_random[i] ^  m_block_random[i+1] ) ;
-    }
-    m_block_random[n_quantum -1] = (m_block_random[n_quantum -1] ^ first_word ) ;
-}
-*/
 
+void BitArray::setbit( uint16_t index , bool value )
+{
+    uint16_t byte_offset = index / 8 ;
+    uint16_t bit_offset =  index % 8 ;
+    unsigned char mask = 1 << bit_offset ;
+    if ( value )
+        array[byte_offset] |= mask ;
+    else
+        array[byte_offset] &= (unsigned char) (~mask) ;
+}
+
+
+bool BitArray::operator[] ( uint16_t index )
+{
+    uint16_t byte_offset = index / 8 ;
+    uint16_t bit_offset =  index % 8 ;
+    char mask = 1 << bit_offset ;
+    return array[byte_offset] & mask ;
+}
+
+void BitArray::Init( unsigned char * in_array )
+{
+    array = in_array ;
+}
+
+uint16_t BitArray::get(uint16_t index, uint16_t nbits)
+{
+    uint16_t byte_offset = index / 8 ;
+    uint16_t bit_offset =  index % 8 ;
+    
+    uint16_t res = 0 ;
+
+    
+    uint16_t i = 0 ;
+    while ( i < nbits )
+    {
+        uint16_t lnbits = 8 - bit_offset ;
+        if ( i + lnbits > nbits )
+            lnbits = nbits - i ;
+        
+        unsigned char mask = 1 ;
+        mask <<= lnbits ;
+        mask -- ;
+        mask <<= bit_offset ;
+        
+        uint16_t lres = ( array[byte_offset] & mask ) >> bit_offset ;
+        lres <<= i ;
+        assert( i < 16 ) ;
+        res |= lres ;
+        
+        i+= lnbits ;
+        bit_offset += lnbits ;
+        assert( bit_offset <= 8 ) ;
+        if ( bit_offset == 8 )
+        {
+            bit_offset = 0 ;
+            byte_offset ++ ;
+        }
+
+    }
+    return res ;
+}
+
+void BitArray::set(uint16_t index, uint16_t nbits, uint16_t value )
+{
+    uint16_t byte_offset = index / 8 ;
+    uint16_t bit_offset =  index % 8 ;
+    
+    uint16_t i = 0 ;
+    while ( i < nbits )
+    {
+        uint16_t lnbits = 8 - bit_offset ;
+        if ( i + lnbits > nbits )
+            lnbits = nbits - i ;
+        
+        unsigned char mask = 1 ;
+        mask <<= lnbits ;
+        mask -- ;
+
+        unsigned char lval = (value >> i) & mask ;
+        lval <<= bit_offset ;
+
+        mask <<= bit_offset ;
+        
+        array[ byte_offset ] &= ~mask ;
+        array[ byte_offset ] |= lval ;
+        
+        assert( i < 16 ) ;
+        
+        i+= lnbits ;
+        bit_offset += lnbits ;
+        assert( bit_offset <= 8 ) ;
+        if ( bit_offset == 8 )
+        {
+            bit_offset = 0 ;
+            byte_offset ++ ;
+        }
+
+    }
+}
+
+class Init;

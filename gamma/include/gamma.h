@@ -1,47 +1,69 @@
 #ifndef GAMMA_H_INCLUDED
 #define GAMMA_H_INCLUDED
 
-#include "platform.h"
+#include "../platform.h"
 #include "randomroutines.h"
 
 #include <string>
 #include <iostream>
 #include <cstring>
+#include <memory>
 
 class GammaCrypt
 {
-    static const size_t block_size = 64 ;    // in bytes
-    static const size_t quantum_size = sizeof ( unsigned) ; // block size of one calculating operation (probably 32 or 64 bit) 
-                                            // размер блока одной вычислительной операции (наверняка 32 или 64 бита)
-    static const size_t n_quantum = block_size / quantum_size ;
-    typedef unsigned t_block[ n_quantum ] ;
-    typedef unsigned t_block_random[ n_quantum + 1 ] ; // to transform Random block it is required one quantum more (therefore "+1")
-
-    //write header into output file (i.e. Key) 
-    void WriteHead() ;
-    //read header from input file
-    void ReadHead() ;
-
-    // actually crypt algorythm
-    // called from Encrypt(), Decrypt()
-    void Crypt() ;
-    
-    t_block_random m_block_random ; 
-    t_block m_block_password ;
-    t_block m_block_source ;
-    t_block m_block_dest ;
-
-    std::istream & m_ifs ;
-    std::ostream & m_ofs ;
-    
-    const std::string & m_password ;
-    
 public:
     GammaCrypt( std::istream & ifs , std::ostream & ofs , const std::string & password ) ;
 
     void Encrypt() ;
     void Decrypt() ;
+
+private:    
+    size_t m_block_size = 64 ;    // in bytes , further calculated in Initialize method, deponds on file size
+    static const size_t m_quantum_size = sizeof ( unsigned) ; // block size of one calculating operation (probably 32 or 64 bit) 
+                                            // размер блока одной вычислительной операции (наверняка 32 или 64 бита)
+    size_t m_n_quantum = m_block_size / m_quantum_size ;
     
+    void Initialize() ;
+
+    //write header into output file (i.e. Key) 
+    void WriteHead() ;
+    //read header from input file
+    void ReadHead() ;
+    
+    //read keys, matrix etc.
+    void ReadOverheadData() ;
+
+    // actually crypt algorythm
+    // called from Encrypt(), Decrypt()
+    void Crypt() ;
+    
+    std::istream & m_ifs ;
+    std::ostream & m_ofs ;
+    
+    const std::string & m_password ;
+    
+    std::unique_ptr< t_block > mp_block_random ; // mp_...   m - member, p - pointer
+    std::unique_ptr< t_block > mp_block_password ;
+    std::unique_ptr< t_block > mp_block_source ;
+    std::unique_ptr< t_block > mp_block_dest ;
+    
+    BitsetItmesArray m_Reposition ;
+
+    void Matrix_Xor_Password( uint16_t * pmatrix_in , unsigned * pmatrix_out ) ;
+    
+    struct t_header
+    {
+        // 0x00
+        uint8_t major_ver = 0x00 ;
+        uint8_t minor_ver = 0x00 ;
+        // 0x2
+        uint16_t data_offset ;  // начало блока ключа.
+                                // относительно начала файла (заголовка) , то есть размер заголовка
+        // 0x4
+        unsigned source_file_size ; // размер исходного файла
+        uint16_t h_block_size ; // размер блока (ключа и пр.). h_ (header) - чтобы не путаться с другими "block_size"
+        uint16_t reserved2 = 0 ;
+    } m_header ; 
 } ;
 
 #endif // GAMMA_H_INCLUDED

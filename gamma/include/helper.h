@@ -6,7 +6,7 @@
 bool EnterPassword( std::string & password , bool twice ) ;
 
 
-bool OpenFiles(const std::string in_filename, const std::string out_filename /* input and output files */
+void OpenFiles(const std::string in_filename, const std::string out_filename /* input and output files */
                 , std::ifstream & ifs , std::ofstream & ofs ) ;
 
 

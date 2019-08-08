@@ -1,16 +1,16 @@
 
 #include "helper.h"
-#include "display.h"
-#include "platform.h"
+#include "../Display/ConsoleDisplay/include/display.h"
+#include "../platform.h"
 
 using namespace std ;
 
-#ifdef GAMMA_LINUX
+#ifdef LINUX
 #include <termios.h>
 #include <unistd.h>
 #endif
 
-#ifdef GAMMA_WINDOWS
+#ifdef WINDOWS
 #include <windows.h>
 #include <conio.h>
 #endif
@@ -21,14 +21,14 @@ bool EnterPassword( string & password , bool twice )
 {
     //make console input invisible
 
-#ifdef GAMMA_LINUX
+#ifdef LINUX
     termios oldt;
     tcgetattr(STDIN_FILENO, &oldt);
     termios newt = oldt;
     newt.c_lflag &= ~ECHO;
     tcsetattr(STDIN_FILENO, TCSANOW, &newt);
 #endif
-#ifdef GAMMA_WINDOWS
+#ifdef WINDOWS
     HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE); 
     DWORD mode = 0;
     GetConsoleMode(hStdin, &mode);
@@ -61,10 +61,10 @@ bool EnterPassword( string & password , bool twice )
     }
 
     //restore console visibility
-#ifdef GAMMA_LINUX
+#ifdef LINUX
     tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
 #endif
-#ifdef GAMMA_WINDOWS
+#ifdef WINDOWS
     SetConsoleMode(hStdin, mode);
 #endif
 
@@ -75,25 +75,21 @@ bool EnterPassword( string & password , bool twice )
 // OpenFile
 // in:  string in_filename, string out_filename
 // out: ifstream & ifs, ofstream & ofs
-bool OpenFiles(const std::string in_filename, const std::string out_filename /* input and output files */
+void OpenFiles(const std::string in_filename, const std::string out_filename /* input and output files */
                 , ifstream & ifs , ofstream & ofs )
 {
     ifs.open( in_filename.c_str() , ifstream::in | ifstream::binary ) ;
     if ( ! ifs.is_open() )
     {
-        display_err( " Error opening input file for reading" ) ;
-        return false ;
+        display_str( help_string ) ;
+        throw( " Error opening input file for reading" ) ;
     }
 
     ofs.open( out_filename.c_str(), ifstream::out | ifstream::binary | ifstream::trunc ) ;
 
     if ( ! ofs.is_open() )
-    {
-        display_err( " Error opening output file for writing" ) ;
-        return false ;
-    }
+        throw( " Error opening output file for writing" ) ;
 
-    return true ;
 }
 
 
@@ -166,14 +162,14 @@ void CmdLnParser::ParseCommandLine( int argc , char **argv )
 
     if ( action == encrypt)
     {
-        m_in_filename = "source" ;
-        m_out_filename = "encrypted" ;
+        m_in_filename ="source" ; // "/home/anton/ramdisk/source" ; //
+        m_out_filename = "encrypted" ; // "/home/anton/ramdisk/encrypted" ; //
 		psw_input_twice = true ;
     }
     else
     {
-        m_in_filename = "encrypted" ;
-        m_out_filename = "source" ;
+        m_in_filename = "encrypted" ; // "/home/anton/ramdisk/encrypted" ; //
+        m_out_filename = "source" ; // "/home/anton/ramdisk/source" ; //
 		psw_input_twice = false ;
     }
     

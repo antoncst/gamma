@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<CodeLite_Workspace Name="03Gamma" Database="" Version="10.0.0">
+<CodeLite_Workspace Name="armo" Database="" Version="10.0.0">
   <Project Name="gamma" Path="gamma/gamma.project" Active="Yes"/>
   <BuildMatrix>
     <WorkspaceConfiguration Name="Debug" Selected="no">
