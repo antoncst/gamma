@@ -252,17 +252,17 @@ void GammaCrypt::ReadOverheadData()
     for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
         mp_block_random[i] = block_key[i] ^ mp_block_password[i] ;
     // Matrix
-    m_ifs.read( (char*) m_Reposition.m_array.get() , m_Reposition.matrix_size_bytes ) ;
-    if ( (unsigned) m_ifs.gcount() <  m_Reposition.matrix_size_bytes )
+    m_ifs.read( (char*) m_Reposition.m_BIarray.m_array.get() , m_Reposition.m_BIarray.matrix_size_bytes ) ;
+    if ( (unsigned) m_ifs.gcount() <  m_Reposition.m_BIarray.matrix_size_bytes )
         throw ("error: File too short, missing matrix block") ;
         
-    unsigned block_matrix_size_words = m_Reposition.matrix_size_bytes / sizeof(unsigned) ;
-    if ( m_Reposition.matrix_size_bytes % sizeof( unsigned ) != 0  )
+    unsigned block_matrix_size_words = m_Reposition.m_BIarray.matrix_size_bytes / sizeof(unsigned) ;
+    if ( m_Reposition.m_BIarray.matrix_size_bytes % sizeof( unsigned ) != 0  )
         block_matrix_size_words++ ;
 
     auto block_matrix_xored = make_unique< unsigned[] >( block_matrix_size_words ) ;
-    Matrix_Xor_Password( (uint16_t *) m_Reposition.m_array.get() , block_matrix_xored.get() ) ;
-    memcpy( m_Reposition.m_array.get() , block_matrix_xored.get() , m_Reposition.matrix_size_bytes ) ;
+    Matrix_Xor_Password( (uint16_t *) m_Reposition.m_BIarray.m_array.get() , block_matrix_xored.get() ) ;
+    memcpy( m_Reposition.m_BIarray.m_array.get() , block_matrix_xored.get() , m_Reposition.m_BIarray.matrix_size_bytes ) ;
 
     m_Reposition.InverseRearrangeMatrix() ;
 
@@ -286,11 +286,11 @@ void GammaCrypt::WriteHead()
     
     //Reposition matrix
     // 1) XOR with password_block
-    unsigned block_matrix_size_words = m_Reposition.matrix_size_bytes / sizeof(unsigned) ;
-    if ( m_Reposition.matrix_size_bytes % sizeof( unsigned ) != 0  )
+    unsigned block_matrix_size_words = m_Reposition.m_BIarray.matrix_size_bytes / sizeof(unsigned) ;
+    if ( m_Reposition.m_BIarray.matrix_size_bytes % sizeof( unsigned ) != 0  )
         block_matrix_size_words++ ;
     auto block_matrix_xored = make_unique< unsigned[] >( block_matrix_size_words ) ;
-    Matrix_Xor_Password( ( uint16_t * ) m_Reposition.m_array.get() , block_matrix_xored.get() ) ;
+    Matrix_Xor_Password( ( uint16_t * ) m_Reposition.m_BIarray.m_array.get() , block_matrix_xored.get() ) ;
     // 2) write to file
     m_ofs.write( (char*) block_matrix_xored.get() , block_matrix_size_words * sizeof(unsigned) ) ;
 }
@@ -298,8 +298,8 @@ void GammaCrypt::WriteHead()
 void GammaCrypt::Matrix_Xor_Password( uint16_t * pmatrix_in , unsigned * pmatrix_out )
 {
     // to do матрицу надо выровнять по размеру блока, иначе block_password будет незаксоренный
-    unsigned N_blocks = m_Reposition.matrix_size_bytes / m_block_size ;
-    if ( m_Reposition.matrix_size_bytes % m_block_size != 0  )
+    unsigned N_blocks = m_Reposition.m_BIarray.matrix_size_bytes / m_block_size ;
+    if ( m_Reposition.m_BIarray.matrix_size_bytes % m_block_size != 0  )
         N_blocks++ ;
     const unsigned block_size_words = m_block_size / sizeof( unsigned ) ; // размер блока в словах unsigned
 
@@ -318,11 +318,11 @@ void GammaCrypt::Matrix_Xor_Password( uint16_t * pmatrix_in , unsigned * pmatrix
 } ;
 
 void GammaCrypt::Crypt()
-{
+{ ;
 /*    
     // for debugging
     std::array<t_block, 10000> v ;
     size_t n = 0 ;
     bool b_found = false ;
 */    
-}
+} ;

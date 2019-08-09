@@ -35,7 +35,6 @@ public:
 
 } ;
 
-
 static const std::string help_string  = 
     "Usage:\n" 
     "gamma [-command] [file1] [file2]\n"
@@ -55,4 +54,3 @@ static const std::string help_string  =
     "gamma -d example.crypted\n"
     "       decrypt file 'example.crypted' to file 'source'\n"
     ;
-

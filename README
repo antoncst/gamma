@@ -4,7 +4,7 @@ File encryption utility.
 Developed in the Codelite IDE. Complier g++ 7.4.0
 
 Platforms: linux, windows.
-The platform is specified in gamma/include/platform.h
+The platform is specified in platform.h
 To make project use command
 make -j2 -e -f Makefile 
 

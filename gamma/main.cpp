@@ -9,17 +9,15 @@
 #include "helper.h"
 #include <cstdio>
 
-using namespace std ;
-
 int main(int argc, char **argv)
 {
-    ios::sync_with_stdio(false);
+    std::ios::sync_with_stdio(false);
     
-    ifstream ifs ;
-    ofstream ofs ;
+    std::ifstream ifs ;
+    std::ofstream ofs ;
 
-    string in_filename;
-    string out_filename ;
+    std::string in_filename;
+    std::string out_filename ;
 
     CmdLnParser parser( in_filename , out_filename ) ;
     parser.ParseCommandLine( argc , argv ) ;
@@ -39,7 +37,7 @@ int main(int argc, char **argv)
     }
     
     
-    string password ;
+    std::string password ;
     password = "1234567890AB" ;
     
     if ( ! EnterPassword( password , parser.psw_input_twice ) )
@@ -59,17 +57,17 @@ int main(int argc, char **argv)
     }
     catch( const char * s) 
     {
-        display_err( string( s ) ) ;
+        display_err( std::string( s ) ) ;
         return 1 ;
     }
         
     ifs.close() ;
     ofs.close() ;
-    
+    /*
     #ifdef DEBUG
         std::cout << " Press Enter" << std::endl ;
         getchar() ;
     #endif
-    
+    */
     return 0;
-}
+} ;

@@ -47,7 +47,7 @@ private:
     std::unique_ptr< t_block > mp_block_source ;
     std::unique_ptr< t_block > mp_block_dest ;
     
-    BitsetItmesArray m_Reposition ;
+    RearrangeSlices m_Reposition ;
 
     void Matrix_Xor_Password( uint16_t * pmatrix_in , unsigned * pmatrix_out ) ;
     
