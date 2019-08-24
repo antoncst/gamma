@@ -6,7 +6,7 @@
 #include <time.h>       /* time */
 #include <memory>
 #include <chrono>
-
+#include <sstream>
 //#include <array> // for debug only
 //#include <iostream>  // for debug only
 
@@ -18,12 +18,13 @@ using namespace std ;
 
 GammaCrypt::GammaCrypt( istream & ifs , ostream & ofs ,  const string & password ) 
     : m_ifs( ifs ) , m_ofs( ofs ) , m_password( password ) 
-    , mp_block_random( nullptr ) , mp_block_password( nullptr ) , mp_block_source( nullptr ) , mp_block_dest( nullptr )
+    , mp_block_random( nullptr ) , mp_block_random3( nullptr ) , mp_block_password( nullptr ) , mp_block_source( nullptr ) , mp_block_dest( nullptr )
 {
 }
 
 void GammaCrypt::Initialize()
 {
+    
 /*
     // calculate our 'constants;)'
     if ( file_size > 262143 ) // 256K - 1M
@@ -37,29 +38,33 @@ void GammaCrypt::Initialize()
     else m_block_size = 32 ;        // 0 - 4K
 */
     // calculate our 'constants;)'
-    if ( m_header.source_file_size > 1048575 ) // >= 1M
-        m_block_size = 2048 ;
-    else if ( m_header.source_file_size > 262143 ) // 256K - 1M
-        m_block_size = 1024 ;
-    else if ( m_header.source_file_size > 65535 ) // 64K - 256K
-        m_block_size = 512 ;
-    else if ( m_header.source_file_size > 16384 ) // 16K - 64K
-        m_block_size = 256 ;
-    else if ( m_header.source_file_size > 4096 ) // 4K - 16K
-        m_block_size = 128 ;
-    else if ( m_header.source_file_size > 1024 ) // 1K - 4K
-        m_block_size = 64 ;
-    else if ( m_header.source_file_size > 256 ) // 256 - 1K
-        m_block_size = 32 ;
-    else if ( m_header.source_file_size > 1024 ) // 64 - 256
-        m_block_size = 16 ;
-    else m_block_size = 8 ;        // 0 - 16 - 64
+    if ( mb_need_init_blocksize )
+    {
+        if ( m_header.source_file_size > 1048575 ) // >= 1M
+            m_block_size = 2048 ;
+        else if ( m_header.source_file_size > 262143 ) // 256K - 1M
+            m_block_size = 1024 ;
+        else if ( m_header.source_file_size > 65535 ) // 64K - 256K
+            m_block_size = 512 ;
+        else if ( m_header.source_file_size > 16384 ) // 16K - 64K
+            m_block_size = 256 ;
+        else if ( m_header.source_file_size > 4096 ) // 4K - 16K
+            m_block_size = 128 ;
+        else if ( m_header.source_file_size > 1024 ) // 1K - 4K
+            m_block_size = 64 ;
+        else if ( m_header.source_file_size > 256 ) // 256 - 1K
+            m_block_size = 32 ;
+        else if ( m_header.source_file_size > 1024 ) // 64 - 256
+            m_block_size = 16 ;
+        else m_block_size = 8 ;        // 0 - 16 - 64
+    }
     
     m_n_quantum = m_block_size / m_quantum_size ;
     
     // allocate memory
     mp_block_password = make_unique< t_block >( m_n_quantum ) ;
     mp_block_random   = make_unique< t_block >( m_n_quantum + 1 ) ; // to transform Random block it is required one quantum more (therefore "+1")
+    mp_block_random3   = make_unique< t_block >( m_n_quantum + 1 ) ; // to transform Random block it is required one quantum more (therefore "+1")
     mp_block_source   = make_unique< t_block >( m_n_quantum ) ;
     mp_block_dest     = make_unique< t_block >( m_n_quantum ) ;
 
@@ -89,12 +94,14 @@ void GammaCrypt::Encrypt()
 
     Initialize() ;
         assert( mp_block_random != nullptr ) ;
+        assert( mp_block_random3 != nullptr ) ;
         
     display_str("Generating randoms...") ;
             // time mesaure
             auto mcs1 = std::chrono::high_resolution_clock::now() ;
             //
     GenerateRandoms( m_n_quantum , mp_block_random.get() ) ;
+    GenerateRandoms( m_n_quantum , mp_block_random3.get() ) ;
             // time mesaure
             auto mcs2 = std::chrono::high_resolution_clock::now() ;
             std::chrono::duration<double> mcs = mcs2 - mcs1 ;
@@ -121,10 +128,12 @@ void GammaCrypt::Encrypt()
             std::cout << "Duration: " << drtn << std::endl ;
             //
 
-    WriteHead() ;  
+    WriteHead() ; 
+    DisplayInfo() ;
 
     //CRYPT ;
         assert( mp_block_random != nullptr ) ;
+        assert( mp_block_random3 != nullptr ) ;
         assert( mp_block_source != nullptr ) ;
         assert( mp_block_dest != nullptr ) ;
 
@@ -143,13 +152,18 @@ void GammaCrypt::Encrypt()
         bytes_read = m_ifs.gcount() ;
         
         // XOR1
-        TransformRandom( mp_block_random.get() , m_n_quantum ) ;
+        //TransformRandom( mp_block_random.get() , m_n_quantum ) ;
         for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
-            mp_block_dest[i] = mp_block_source[i] ^ mp_block_random[i] ;
+            mp_block_dest[i] = mp_block_source[i] ;//^ mp_block_random[i] ;
         
         //REPOSITIONING
         m_Reposition.Rearrange( (unsigned char*) mp_block_dest.get() , bytes_read ) ;
         
+        // XOR3
+/*        TransformRandom( mp_block_random3.get() , m_n_quantum ) ;
+        for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
+            mp_block_dest[i] = mp_block_dest[i] ^ mp_block_random3[i] ;
+  */      
         //OUT
         m_ofs.write( (char*) mp_block_dest.get() , m_block_size /*bytes_read*/ ) ;
 
@@ -184,11 +198,19 @@ void GammaCrypt::Encrypt()
 void GammaCrypt::Decrypt()
 {
     ReadHead() ;
+    
+    m_block_size = m_header.h_block_size ;
+    mb_need_init_blocksize = false ;
+    
     Initialize() ;
     m_Reposition.Init( m_block_size ) ;
     ReadOverheadData() ;
+    
+    DisplayInfo() ;
+    
     // CRYPT  Crypt() ;
         assert( mp_block_random != nullptr ) ;
+        assert( mp_block_random3 != nullptr ) ;
         assert( mp_block_source != nullptr ) ;
         assert( mp_block_dest != nullptr ) ;
 
@@ -201,13 +223,18 @@ void GammaCrypt::Decrypt()
         if ( bytes_read == 0 )
             break ;
         
+        // XOR3
+/*        TransformRandom( mp_block_random3.get() , m_n_quantum ) ;
+        for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
+            mp_block_source[i] = mp_block_source[i] ^ mp_block_random3[i] ;
+  */      
         //REPOSITIONING
         
         m_Reposition.Rearrange( ( unsigned char*) mp_block_source.get() , bytes_read ) ;
         // XOR1
-        TransformRandom( mp_block_random.get() , m_n_quantum ) ;
+        //TransformRandom( mp_block_random.get() , m_n_quantum ) ;
         for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
-            mp_block_dest[i] = mp_block_source[i] ^ mp_block_random[i] ;
+            mp_block_dest[i] = mp_block_source[i] ; //^ mp_block_random[i] ;
         
         //it should not be the tail now
         // checking tail size
@@ -242,15 +269,26 @@ void GammaCrypt::ReadHead()
 void GammaCrypt::ReadOverheadData()
 {
         assert( mp_block_random != nullptr ) ;
+        assert( mp_block_random3 != nullptr ) ;
         assert( mp_block_password != nullptr ) ;
     //Block_key
     auto block_key = make_unique< t_block >( m_n_quantum );
+    //Key1
     m_ifs.read( (char*) block_key.get() , m_block_size ) ;
-    
     if ( (unsigned) m_ifs.gcount() <  m_block_size )
         throw ("error: File too short, missing key block") ;
+
     for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
         mp_block_random[i] = block_key[i] ^ mp_block_password[i] ;
+
+    //Key3
+    m_ifs.read( (char*) block_key.get() , m_block_size ) ;
+    if ( (unsigned) m_ifs.gcount() <  m_block_size )
+        throw ("error: File too short, missing key block") ;
+
+    for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
+        mp_block_random3[i] = block_key[i] ^ mp_block_password[i] ;
+
     // Matrix
     m_ifs.read( (char*) m_Reposition.m_BIarray.m_array.get() , m_Reposition.m_BIarray.matrix_size_bytes ) ;
     if ( (unsigned) m_ifs.gcount() <  m_Reposition.m_BIarray.matrix_size_bytes )
@@ -271,6 +309,7 @@ void GammaCrypt::ReadOverheadData()
 void GammaCrypt::WriteHead()
 {
         assert( mp_block_random != nullptr ) ;
+        assert( mp_block_random3 != nullptr ) ;
         assert( mp_block_password != nullptr ) ;
     
     //Header
@@ -280,8 +319,13 @@ void GammaCrypt::WriteHead()
     
     //Block_key
     auto block_key = make_unique< t_block >( m_n_quantum );
+    //Key1
     for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
         block_key[i] = mp_block_random[i] ^ mp_block_password[i] ;
+    m_ofs.write( (char*) block_key.get() , m_block_size ) ;
+    //Key3
+    for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
+        block_key[i] = mp_block_random3[i] ^ mp_block_password[i] ;
     m_ofs.write( (char*) block_key.get() , m_block_size ) ;
     
     //Reposition matrix
@@ -297,7 +341,7 @@ void GammaCrypt::WriteHead()
 
 void GammaCrypt::Matrix_Xor_Password( uint16_t * pmatrix_in , unsigned * pmatrix_out )
 {
-    // to do матрицу надо выровнять по размеру блока, иначе block_password будет незаксоренный
+    // матрица должна быть выровняна по размеру блока, иначе block_password будет незаксоренный
     unsigned N_blocks = m_Reposition.m_BIarray.matrix_size_bytes / m_block_size ;
     if ( m_Reposition.m_BIarray.matrix_size_bytes % m_block_size != 0  )
         N_blocks++ ;
@@ -326,3 +370,29 @@ void GammaCrypt::Crypt()
     bool b_found = false ;
 */    
 } ;
+
+
+void GammaCrypt::SetBlockSize( unsigned block_size )
+{
+    mb_need_init_blocksize = false ;
+    unsigned temp = block_size ;
+    unsigned log2 = 0 ; 
+    while ( temp >>= 1 ) log2 ++ ;
+    m_block_size = 1 ;
+    for ( unsigned i = 0 ; i < log2 ; ++i )
+        m_block_size <<= 1 ;
+    if ( m_block_size < 8)
+        m_block_size = 64 ;
+}
+
+void GammaCrypt::DisplayInfo()
+{
+    ostringstream oss ;
+    oss << "\n source file size: " << m_header.source_file_size ;
+    oss << "\n block size: " << m_block_size ;
+    oss << "\n matrix size (bytes): " << m_Reposition.m_BIarray.matrix_size_bytes ;
+    oss << "\n number of matrix elements: " << m_Reposition.m_BIarray.max_index ;
+    oss << "\n size of one matrix element (bits): " << m_Reposition.m_BIarray.index_size_bits ;
+    oss << "\n" ;
+    display_str( oss.str() ) ;
+}

@@ -11,7 +11,7 @@
 
 int main(int argc, char **argv)
 {
-    std::ios::sync_with_stdio(false);
+    //std::ios::sync_with_stdio(false);
     
     std::ifstream ifs ;
     std::ofstream ofs ;
@@ -47,11 +47,16 @@ int main(int argc, char **argv)
     assert( ofs.is_open() ) ;
 
     GammaCrypt gm( ifs , ofs , password ) ;
-
+    
     try 
     {
         if ( parser.action == parser.none || parser.action == parser.encrypt )
+        {
+            if ( parser.mb_blocksize_specified )
+                gm.SetBlockSize( parser.m_block_size ) ;
+
             gm.Encrypt() ;
+        }
         else
             gm.Decrypt() ;
     }
@@ -63,11 +68,11 @@ int main(int argc, char **argv)
         
     ifs.close() ;
     ofs.close() ;
-    /*
+    
     #ifdef DEBUG
         std::cout << " Press Enter" << std::endl ;
         getchar() ;
     #endif
-    */
+    
     return 0;
 } ;

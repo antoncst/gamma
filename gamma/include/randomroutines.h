@@ -32,12 +32,12 @@ public:
     BitArray() {} ;
     //
     void Init( unsigned char * in_array ) ;
-    bool operator[] ( unsigned index ) ;
-    void setbit( unsigned index , bool value ) ;
+    inline bool operator[] ( unsigned index ) noexcept ;
+    inline void setbit( unsigned index , bool value ) noexcept ;
     // get nbits bits , beginning from index(in bits)
     // nbits should be <= 16
-    uint16_t get( unsigned index , uint16_t nbits ) ;
-    void set( unsigned index , uint16_t nbits , uint16_t value ) ;
+    inline uint16_t get( unsigned index , uint16_t nbits ) noexcept ;
+    inline void set( unsigned index , uint16_t nbits , uint16_t value ) noexcept ;
     unsigned char * array ;
 private:
 } ;
@@ -50,8 +50,8 @@ class BitsetItmesArray
 public:
     void Init( size_t block_size ) ;
     
-    uint16_t operator[] (uint16_t index) ;
-    void set( uint16_t index , uint16_t val ) ;
+    inline uint16_t operator[] (uint16_t index) noexcept ;
+    inline void set( uint16_t index , uint16_t val ) noexcept ;
 
     std::unique_ptr< unsigned char[] > m_array ;
     unsigned max_index ; //  that is matrix length, the numbers of elements

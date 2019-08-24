@@ -102,7 +102,8 @@ void CmdLnParser::ParseCommandLine( int argc , char **argv )
 {
     m_b_error = false ;
     int arg_counter = 0;
-    
+    mb_blocksize_specified = false ;
+   
     action = none ;
     int n_infile = 0 ;  // the index of the argv argument that points to the file name
     int n_outfile = 0 ; // similarly
@@ -123,6 +124,15 @@ void CmdLnParser::ParseCommandLine( int argc , char **argv )
                 else if ( s == "-d" || s == "--decrypt" )
                     if ( action == none )
                         action = decrypt ;
+                    else
+                        { m_b_error = true ; break ; } 
+                else if ( s == "-s" || s == "--size" )
+                    if ( i + 1 < argc  )
+                    {
+                        m_block_size = std::stoul( argv[ i+1 ] ) ;
+                        i++ ;
+                        mb_blocksize_specified = true ;
+                    }
                     else
                         { m_b_error = true ; break ; } 
                 else if ( s == "-h" || s == "--help" )

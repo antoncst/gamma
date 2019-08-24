@@ -29,6 +29,9 @@ public:
         encrypt,
         decrypt
     } action ;
+    
+    bool mb_blocksize_specified ;
+    unsigned m_block_size ;
 
 /*    int password ; // 0 - password is not specified
 */                         // otherwise number of argv
@@ -37,13 +40,18 @@ public:
 
 static const std::string help_string  = 
     "Usage:\n" 
-    "gamma [-command] [file1] [file2]\n"
+    "gamma [-command] [-s N] [file1] [file2]\n"
+    "\n"
     "commands:\n"
     "-e --encrypt [source_file] [encrypted_file]\n"
     "-d --decrypt [encrypted_file] [source_file]\n"
+    "\n"
     "default command is --encrypt\n"
     "default source_file is 'source'\n"
-    "default encrypted_file is'encrypted'\n"
+    "default encrypted_file is 'encrypted'\n"
+    "\n"
+    "-s N  :  block size. N should be a power of 2.\n"
+    "\n"
     "Examples:\n"
     "gamma   \n"
     "       encrypt file 'source' to file 'encrypted'\n"

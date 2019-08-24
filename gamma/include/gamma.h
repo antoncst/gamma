@@ -16,9 +16,12 @@ public:
 
     void Encrypt() ;
     void Decrypt() ;
+    void SetBlockSize( unsigned block_size ) ;
 
 private:    
     size_t m_block_size = 64 ;    // in bytes , further calculated in Initialize method, deponds on file size
+    bool mb_need_init_blocksize = true ; // for if block_size specified in command line
+
     static const size_t m_quantum_size = sizeof ( unsigned) ; // block size of one calculating operation (probably 32 or 64 bit) 
                                             // размер блока одной вычислительной операции (наверняка 32 или 64 бита)
     size_t m_n_quantum = m_block_size / m_quantum_size ;
@@ -43,6 +46,7 @@ private:
     const std::string & m_password ;
     
     std::unique_ptr< t_block > mp_block_random ; // mp_...   m - member, p - pointer
+    std::unique_ptr< t_block > mp_block_random3 ;
     std::unique_ptr< t_block > mp_block_password ;
     std::unique_ptr< t_block > mp_block_source ;
     std::unique_ptr< t_block > mp_block_dest ;
@@ -50,6 +54,8 @@ private:
     RearrangeSlices m_Reposition ;
 
     void Matrix_Xor_Password( uint16_t * pmatrix_in , unsigned * pmatrix_out ) ;
+    
+    void DisplayInfo() ;
     
     struct t_header
     {

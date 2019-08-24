@@ -11,7 +11,6 @@
 #include <memory>
 #include <fstream>
 #include <iostream>
-#include <deque>
 #include <vector>
 
 #include <thread> //for sleep
@@ -178,13 +177,16 @@ unsigned CompoundContiguousRandoms( unsigned const rsize , t_block block , unsig
         rsize_bits-- ; // т.к. сбросили старшую единицу
         rval = rval << current_bit_offset ; //сдвигаю влево, может логичнее было бы двигать вправо, но т.к. у нас ГСЧ, то значения никакого не имеет
         
-        block[ current_block_index ] |=  rval & 0xFFFFFFFF ;
+        block[ current_block_index ] |= unsigned ( rval & 0xFFFFFFFF );
         if ( current_bit_offset + rsize_bits > 31 ) // got out of 32 bits / вылез за 32 бита
         {
-            if ( current_block_index + 1 > rsize )
+            if ( current_block_index + 1 >= rsize )
+            {
+                current_block_index++ ;
                 break ;
+            }
             else
-                block[ current_block_index +1 ] |= ( rval >> 32 ) ;
+                block[ current_block_index +1 ] |= unsigned ( rval >> 32 ) ;
         }
         assert( current_block_index < rsize ) ;
         
@@ -194,7 +196,7 @@ unsigned CompoundContiguousRandoms( unsigned const rsize , t_block block , unsig
             current_bit_offset -= 32 ;
             current_block_index++ ;
         }
-        if ( current_block_index + 1 > rsize )
+        if ( current_block_index  >= rsize )
             break ;
     }
     
@@ -345,44 +347,24 @@ void RearrangeSlices::InverseRearrangeMatrix()
     {
         inverse_matrix.set( m_BIarray[ i ] , i ) ;
     }
-    memcpy( m_BIarray.m_array.get() , inverse_matrix.m_array.get() , m_BIarray.matrix_size_bytes ) ; // to do move
+    memcpy( m_BIarray.m_array.get() , inverse_matrix.m_array.get() , m_BIarray.matrix_size_bytes ) ; // todo move
 } 
 
 void RearrangeSlices::MakeRearrangeMatrix()
 {
     //сгенерируем  список индексов
-    //std::deque< uint16_t > indexes_deque( max_index ) ;
     std::vector< uint16_t > indexes_container ;
-    //indexes_container.reserve( m_BIarray.max_index  ) ;
+    indexes_container.reserve( m_BIarray.max_index ) ;
     for ( uint16_t i = 0 ; i < m_BIarray.max_index ; ++i )
         indexes_container.push_back( i ) ;
-        //indexes_container[i] = i  ;
-    // комментарий для uint16,  устаревший :
-    // так, нам нужно рандомов в общем столько же, сколько max_index.
-    // значит нужно max_index * sizeof( uint16 ) байт.
-    // GenetateRandom гененирует в unsigned (4 байта)
-    // 
-    // для заданного размера индека index_size_bits
-    // GenetateRandom гененирует в unsigned (4 байта)
-    // нужно matrix_size_bytes / 4 + 1
-    
-    unsigned N = m_BIarray.matrix_size_bytes / 4 ;
-    if ( m_BIarray.matrix_size_bytes % 4 > 0 )
-        N ++ ;
-    unsigned N_bytes = N * sizeof( unsigned ) ;
-    auto rands = std::make_unique< t_block >( N ) ;
-    //unsigned * rands = new unsigned[ N ] ;
+
     //display_str("Generating randoms for matrix ...") ;
-    GenerateRandoms( N , rands.get() ) ;
-    
+
     BitsetItmesArray BI_rands ;
-    //auto BI_rands = std::make_unique<t_block>( N ) ;
     BI_rands.Init( /*N_bytes*/ m_BIarray.block_size_bytes ) ;
-    //BI_rands.m_array.reset( reinterpret_cast< std::unique_ptr<unsigned char []>::pointer > ( std::move(rands).get() )  )  ;
-    //BI_rands.m_array.reset( reinterpret_cast< std::unique_ptr<unsigned char []>::pointer > ( rands.get() )  )  ;
-    memcpy( (unsigned char*) BI_rands.m_array.get() , (unsigned char*) rands.get() , N_bytes ) ;
-    //BI_rands.m_matrixBA.Init( BI_rands.m_array.get() ) ;
-    //BI_rands = std::move(  rands  ) ;
+
+    assert( m_BIarray.matrix_size_bytes % 4 == 0 ) ;
+    GenerateRandoms( m_BIarray.matrix_size_bytes / 4 , ( unsigned * ) BI_rands.m_array.get() ) ;
     
     //display_str("making matrix...") ;
     for ( unsigned i = 0 ; i < m_BIarray.max_index ; ++i )
@@ -395,18 +377,14 @@ void RearrangeSlices::MakeRearrangeMatrix()
             r = rands [ i/2 ] & 0xffff ;
         else
             r = rands[ i/2 ] >> 16 ; */
+        // m_array[ i ] =  indexes_deque[ rr ] ; // 
         
         uint16_t rr = ( r % ( m_BIarray.max_index - i ) ) ;
-        // m_array[ i ] =  indexes_deque[ rr ] ; // 
-        m_BIarray.set( i , indexes_container[ rr] ) ;
-        //this->operator []()
         //repostn_matrix[ i ] = indexes[ rr ] ;
+        
+        m_BIarray.set( i ,  indexes_container[ rr ] ) ;
         indexes_container.erase( indexes_container.begin() + rr ) ;
     }
-    //rands.reset( reinterpret_cast< std::unique_ptr< t_block >::pointer > ( std::move(BI_rands.m_array).get() )  )  ;
-    //rands.reset( reinterpret_cast< std::unique_ptr< t_block >::pointer > ( BI_rands.m_array.get() )  )  ;
-    std::cout << std::endl ;
-
 } ;
 
 void RearrangeSlices::Rearrange( unsigned char * p_block , uint16_t bytes_read )
@@ -445,19 +423,19 @@ void RearrangeSlices::Rearrange( unsigned char * p_block , uint16_t bytes_read )
     
 }
 
-uint16_t BitsetItmesArray::operator []( uint16_t index )
+inline uint16_t BitsetItmesArray::operator []( uint16_t index ) noexcept
 {
     return m_matrixBA.get( index * index_size_bits , index_size_bits ) ;
 }
 
-void BitsetItmesArray::set( uint16_t index , uint16_t val ) 
+inline void BitsetItmesArray::set( uint16_t index , uint16_t val ) noexcept
 {
     assert( index < max_index ) ;
     m_matrixBA.set( index * index_size_bits , index_size_bits , val ) ;
 }
 
 
-void BitArray::setbit( unsigned index , bool value )
+inline void BitArray::setbit( unsigned index , bool value ) noexcept
 {
     uint16_t byte_offset = index / 8 ;
     uint16_t bit_offset =  index % 8 ;
@@ -469,7 +447,7 @@ void BitArray::setbit( unsigned index , bool value )
 }
 
 
-bool BitArray::operator[] ( unsigned index )
+inline bool BitArray::operator[] ( unsigned index ) noexcept
 {
     uint16_t byte_offset = index / 8 ;
     uint16_t bit_offset =  index % 8 ;
@@ -482,7 +460,7 @@ void BitArray::Init( unsigned char * in_array )
     array = in_array ;
 }
 
-uint16_t BitArray::get(unsigned index, uint16_t nbits)
+inline uint16_t BitArray::get(unsigned index, uint16_t nbits) noexcept
 {
     uint16_t byte_offset = index / 8 ;
     uint16_t bit_offset =  index % 8 ;
@@ -520,7 +498,7 @@ uint16_t BitArray::get(unsigned index, uint16_t nbits)
     return res ;
 }
 
-void BitArray::set(unsigned index, uint16_t nbits, uint16_t value )
+inline void BitArray::set(unsigned index, uint16_t nbits, uint16_t value ) noexcept
 {
     uint16_t byte_offset = index / 8 ;
     uint16_t bit_offset =  index % 8 ;
