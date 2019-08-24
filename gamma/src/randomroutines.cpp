@@ -49,7 +49,7 @@ bool MakeDistrbution_4lowbits( unsigned const N , t_block const rvals , unsigned
     for ( auto dval : dvals )
         std::cout << dval << std::endl ;
     #endif
-  
+    
     for ( auto dval : dvals )
         if ( dval < N * ( 100 - deviation ) / 100 / dsize  ||  dval > N * ( 100 + deviation ) / 100 / dsize  )
             return false ;
@@ -85,17 +85,20 @@ bool MakeDistrbution_5lowbits( unsigned const N , t_block const rvals , unsigned
         std::cout << dval << std::endl ;
     #endif
 
-    bool bonce = false ; // пусть один раз можно будет, что отклонение превышает в два раза
+    // Вообще я полагаю отклонение представляет из себя нормальное распределение
+    // Пусть четверть элементов может иметь отклонение в полтора раза больше допустимого
+    int counter = 0 ;
+
     for ( auto dval : dvals )
     {
         if ( dval < N * ( 100 - deviation ) / 100 / dsize  ||  dval > N * ( 100 + deviation ) / 100 / dsize  )
         {
-            if ( bonce )
+            if ( counter > 8 )
                 return false ;
             else
             {
-                bonce = true ;
-                if ( dval < N * ( 100 - deviation*2 ) / 100 / dsize  ||  dval > N * ( 100 + deviation*2 ) / 100 / dsize  )
+                counter++ ;
+                if ( dval < N * ( 100 - deviation*3/2 ) / 100 / dsize  ||  dval > N * ( 100 + deviation*3/2 ) / 100 / dsize )
                     return false ;
             }
         }
