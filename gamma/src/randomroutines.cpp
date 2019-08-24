@@ -20,7 +20,7 @@
 //GENERATING RANDOM
 
 // отклонение от идеально равномерного распределения, процентов
-const unsigned deviation = 25 ;
+const unsigned deviation = 40 ;
 
 // make statistics distribution (статистическое распределение) lower two bits (shifting left on nshift bits)
 // if distribution is even (равномерное, допускаю отклонение в deviation % ) returns true
@@ -53,6 +53,53 @@ bool MakeDistrbution_4lowbits( unsigned const N , t_block const rvals , unsigned
     for ( auto dval : dvals )
         if ( dval < N * ( 100 - deviation ) / 100 / dsize  ||  dval > N * ( 100 + deviation ) / 100 / dsize  )
             return false ;
+
+    return true ;
+}
+
+// make statistics distribution (статистическое распределение) lower two bits (shifting left on nshift bits)
+// if distribution is even (равномерное, допускаю отклонение в deviation % ) returns true
+// N - размер массива
+// nshift - начиная от какого (с младшей стороны) бита брать 5 бит
+bool MakeDistrbution_5lowbits( unsigned const N , t_block const rvals , unsigned nshift )
+{
+    const size_t dsize = 32 ;
+    unsigned dvals[ dsize ] ;
+    for ( unsigned i = 0 ; i < dsize ; i++ )
+        dvals[i] = 0 ;
+
+    unsigned umask = 0x1f ;
+    umask <<= nshift ;
+    
+    for ( unsigned i = 0 ; i < N ; i++ )
+    {
+        unsigned index = rvals[ i ]  & umask ;
+        index >>= nshift ;
+        dvals[ index ] ++ ;
+    }
+    
+    #ifdef DEBUG
+    std::cout << "bit" << nshift << std::endl ;
+    std::cout << "statistics:\n" ;
+    for ( auto dval : dvals )
+        std::cout << dval << std::endl ;
+    #endif
+
+    bool bonce = false ; // пусть один раз можно будет, что отклонение превышает в два раза
+    for ( auto dval : dvals )
+    {
+        if ( dval < N * ( 100 - deviation ) / 100 / dsize  ||  dval > N * ( 100 + deviation ) / 100 / dsize  )
+        {
+            if ( bonce )
+                return false ;
+            else
+            {
+                bonce = true ;
+                if ( dval < N * ( 100 - deviation*2 ) / 100 / dsize  ||  dval > N * ( 100 + deviation*2 ) / 100 / dsize  )
+                    return false ;
+            }
+        }
+    }
 
     return true ;
 }
@@ -135,8 +182,8 @@ int DetermineNonsignificantLowBits( unsigned const N , t_block const rvals )
     if ( HighSetBit < 1 )  // как минимум д.б. 2 значимых бита
         throw "error: too small random value to processing DetermineNonsignificantLowBits" ;
     int i = 0 ;
-    for ( i = 0 ; i < HighSetBit ; i++ )
-        if ( MakeDistrbution_4lowbits( N , rvals , i ) == 1 )
+    for ( i = 0 ; i <= HighSetBit - 4 ; i++ )
+        if ( MakeDistrbution_5lowbits( N , rvals , i ) == 1 )
             return i ;
     throw "error: fail to make statistic distribution" ;
 }

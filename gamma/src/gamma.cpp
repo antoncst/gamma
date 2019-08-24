@@ -152,18 +152,18 @@ void GammaCrypt::Encrypt()
         bytes_read = m_ifs.gcount() ;
         
         // XOR1
-        //TransformRandom( mp_block_random.get() , m_n_quantum ) ;
+        TransformRandom( mp_block_random.get() , m_n_quantum ) ;
         for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
-            mp_block_dest[i] = mp_block_source[i] ;//^ mp_block_random[i] ;
+            mp_block_dest[i] = mp_block_source[i] ^ mp_block_random[i] ;
         
         //REPOSITIONING
         m_Reposition.Rearrange( (unsigned char*) mp_block_dest.get() , bytes_read ) ;
         
         // XOR3
-/*        TransformRandom( mp_block_random3.get() , m_n_quantum ) ;
+        TransformRandom( mp_block_random3.get() , m_n_quantum ) ;
         for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
             mp_block_dest[i] = mp_block_dest[i] ^ mp_block_random3[i] ;
-  */      
+        
         //OUT
         m_ofs.write( (char*) mp_block_dest.get() , m_block_size /*bytes_read*/ ) ;
 
@@ -224,17 +224,17 @@ void GammaCrypt::Decrypt()
             break ;
         
         // XOR3
-/*        TransformRandom( mp_block_random3.get() , m_n_quantum ) ;
+        TransformRandom( mp_block_random3.get() , m_n_quantum ) ;
         for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
             mp_block_source[i] = mp_block_source[i] ^ mp_block_random3[i] ;
-  */      
+        
         //REPOSITIONING
         
         m_Reposition.Rearrange( ( unsigned char*) mp_block_source.get() , bytes_read ) ;
         // XOR1
-        //TransformRandom( mp_block_random.get() , m_n_quantum ) ;
+        TransformRandom( mp_block_random.get() , m_n_quantum ) ;
         for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
-            mp_block_dest[i] = mp_block_source[i] ; //^ mp_block_random[i] ;
+            mp_block_dest[i] = mp_block_source[i] ^ mp_block_random[i] ;
         
         //it should not be the tail now
         // checking tail size
