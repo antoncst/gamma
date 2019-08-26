@@ -117,7 +117,7 @@ void GenRandByHdd( unsigned const N , t_block rvals )
     {
         
         std::ofstream ofs ;
-        ofs.open( "/home/anton/ramdisk/temp_1", std::ios::out | std::ios::trunc) ;
+        ofs.open( "temp_1", std::ios::out | std::ios::trunc) ;
         ofs << "ttt" ;
         std::this_thread::sleep_for( std::chrono::microseconds( 10 ) ) ;
         ofs.flush() ;
@@ -133,7 +133,7 @@ void GenRandByHdd( unsigned const N , t_block rvals )
 
         {
             std::ofstream ofs2 ;
-            ofs2.open( "/home/anton/ramdisk/temp_2", std::ios::out | std::ios::trunc) ;
+            ofs2.open( "temp_2", std::ios::out | std::ios::trunc) ;
             ofs2 << "ttt" ;
             std::this_thread::sleep_for( std::chrono::microseconds( 10 ) ) ;
             ofs2.flush() ;
