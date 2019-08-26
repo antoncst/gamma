@@ -143,6 +143,8 @@ void GammaCrypt::Encrypt()
             mcs1 = std::chrono::high_resolution_clock::now() ;
             //
 
+    auto temp_block = std::make_unique< unsigned char[] >( m_Reposition.m_BIarray.block_size_bytes ) ; // for Rearrange Matrix
+
     uint16_t bytes_read ;
 
     while ( ! m_ifs.eof() )
@@ -157,7 +159,7 @@ void GammaCrypt::Encrypt()
             mp_block_dest[i] = mp_block_source[i] ^ mp_block_random[i] ;
         
         //REPOSITIONING
-        m_Reposition.Rearrange( (unsigned char*) mp_block_dest.get() , bytes_read ) ;
+        m_Reposition.Rearrange( (unsigned char*) mp_block_dest.get() , bytes_read , temp_block.get() ) ;
         
         // XOR3
         TransformRandom( mp_block_random3.get() , m_n_quantum ) ;
@@ -214,6 +216,8 @@ void GammaCrypt::Decrypt()
         assert( mp_block_source != nullptr ) ;
         assert( mp_block_dest != nullptr ) ;
 
+    auto temp_block = std::make_unique< unsigned char[] >( m_Reposition.m_BIarray.block_size_bytes ) ; // for Rearrange Matrix
+
     int64_t i = m_header.source_file_size ;
     while ( i > 0 )
     {
@@ -230,7 +234,7 @@ void GammaCrypt::Decrypt()
         
         //REPOSITIONING
         
-        m_Reposition.Rearrange( ( unsigned char*) mp_block_source.get() , bytes_read ) ;
+        m_Reposition.Rearrange( ( unsigned char*) mp_block_source.get() , bytes_read , temp_block.get() ) ;
         // XOR1
         TransformRandom( mp_block_random.get() , m_n_quantum ) ;
         for ( unsigned i = 0 ; i < m_n_quantum ; i++ )

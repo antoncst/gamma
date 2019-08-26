@@ -71,6 +71,6 @@ public:
     void Init( size_t block_size ) ;
     void MakeRearrangeMatrix() ;
     void InverseRearrangeMatrix() ;
-    void Rearrange( unsigned char * p_block_dest , uint16_t bytes_read ) ;
+    void Rearrange( unsigned char * p_block , uint16_t bytes_read , unsigned char * temp_block ) noexcept ;
 
 } ;

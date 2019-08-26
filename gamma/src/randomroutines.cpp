@@ -437,7 +437,7 @@ void RearrangeSlices::MakeRearrangeMatrix()
     }
 } ;
 
-void RearrangeSlices::Rearrange( unsigned char * p_block , uint16_t bytes_read )
+void RearrangeSlices::Rearrange( unsigned char * p_block , uint16_t bytes_read , unsigned char * temp_block ) noexcept
 {
     
     if ( bytes_read < m_BIarray.block_size_bytes )
@@ -446,11 +446,10 @@ void RearrangeSlices::Rearrange( unsigned char * p_block , uint16_t bytes_read )
         memset( p_block + bytes_read, 0 , m_BIarray.block_size_bytes - bytes_read ) ;
     }
     
-    auto res_block = std::make_unique< unsigned char[]  >( m_BIarray.block_size_bytes ) ;
-    memset( res_block.get() , 0 , m_BIarray.block_size_bytes ) ; // todo out away
+    memset( temp_block , 0 , m_BIarray.block_size_bytes ) ; // todo out away
 
     BitArray src_BA( p_block ) ;
-    BitArray res_BA( res_block.get() ) ;
+    BitArray res_BA( temp_block ) ;
     
     for ( uint16_t i = 0 ; i < m_BIarray.max_index ; ++i )
     {
@@ -469,7 +468,7 @@ void RearrangeSlices::Rearrange( unsigned char * p_block , uint16_t bytes_read )
         //res_BA.setbit( i , src_BA[ m_array[ i ] ] ) ;
         res_BA.setbit( i , src_BA[ m_BIarray[ i ] ] ) ;
     }
-    memcpy(  p_block , res_block.get() , m_BIarray.block_size_bytes ) ; //todo realize move semantic
+    memcpy(  p_block , temp_block , m_BIarray.block_size_bytes ) ; //todo realize move semantic
     
 }
 
