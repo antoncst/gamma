@@ -68,7 +68,7 @@ private:
         uint16_t data_offset ;  // начало блока ключа.
                                 // относительно начала файла (заголовка) , то есть размер заголовка
         // 0x4
-        unsigned source_file_size ; // размер исходного файла
+        uint64_t source_file_size ; // размер исходного файла
         uint16_t h_block_size ; // размер блока (ключа и пр.). h_ (header) - чтобы не путаться с другими "block_size"
         uint16_t reserved2 = 0 ;
     } m_header ; 
