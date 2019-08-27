@@ -57,6 +57,8 @@ private:
     
     void DisplayInfo() ;
     
+    void ( * mpShift )( unsigned * p_block ) ;
+    
     struct t_header
     {
         // 0x00

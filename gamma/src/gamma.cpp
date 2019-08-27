@@ -11,6 +11,7 @@
 //#include <iostream>  // for debug only
 
 #include "gamma.h"
+#include "LFSR.h"
 #include "../../Display/ConsoleDisplay/include/display.h"
 
 using namespace std ;
@@ -36,7 +37,7 @@ void GammaCrypt::Initialize()
     else if ( file_size > 4096 ) // 4K - 16K
         m_block_size = 64 ;
     else m_block_size = 32 ;        // 0 - 4K
-*/
+
     // calculate our 'constants;)'
     if ( mb_need_init_blocksize )
     {
@@ -58,6 +59,24 @@ void GammaCrypt::Initialize()
             m_block_size = 16 ;
         else m_block_size = 8 ;        // 0 - 16 - 64
     }
+*/
+    if ( mb_need_init_blocksize )
+    {
+        if ( m_header.source_file_size >= 1048575 ) // 1M - 
+            m_block_size = 32 ;
+        else if ( m_header.source_file_size >= 4096 ) // 4K - 1M
+            m_block_size = 16 ;
+        else        // 0 - 4K
+            m_block_size = 8 ;        
+    }
+
+    // init mpShift
+    if ( m_header.source_file_size >= 1048575 ) // 1M - 
+        mpShift = Shift256 ;
+    else if ( m_header.source_file_size >= 4096 ) // 4K - 1M
+        mpShift = Shift128 ;
+    else        // 0 - 4K
+        mpShift = Shift64 ;
     
     m_n_quantum = m_block_size / m_quantum_size ;
     
@@ -154,7 +173,8 @@ void GammaCrypt::Encrypt()
         bytes_read = m_ifs.gcount() ;
         
         // XOR1
-        TransformRandom( mp_block_random.get() , m_n_quantum ) ;
+        //TransformRandom( mp_block_random.get() , m_n_quantum ) ;
+        ( *mpShift )( mp_block_random.get() ) ;
         for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
             mp_block_dest[i] = mp_block_source[i] ^ mp_block_random[i] ;
         
@@ -162,7 +182,8 @@ void GammaCrypt::Encrypt()
         m_Reposition.Rearrange( (unsigned char*) mp_block_dest.get() , bytes_read , temp_block.get() ) ;
         
         // XOR3
-        TransformRandom( mp_block_random3.get() , m_n_quantum ) ;
+        //TransformRandom( mp_block_random3.get() , m_n_quantum ) ;
+        ( *mpShift )( mp_block_random3.get() ) ;
         for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
             mp_block_dest[i] = mp_block_dest[i] ^ mp_block_random3[i] ;
         
@@ -228,7 +249,8 @@ void GammaCrypt::Decrypt()
             break ;
         
         // XOR3
-        TransformRandom( mp_block_random3.get() , m_n_quantum ) ;
+        //TransformRandom( mp_block_random3.get() , m_n_quantum ) ;
+        ( *mpShift )( mp_block_random3.get() ) ;
         for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
             mp_block_source[i] = mp_block_source[i] ^ mp_block_random3[i] ;
         
@@ -236,7 +258,8 @@ void GammaCrypt::Decrypt()
         
         m_Reposition.Rearrange( ( unsigned char*) mp_block_source.get() , bytes_read , temp_block.get() ) ;
         // XOR1
-        TransformRandom( mp_block_random.get() , m_n_quantum ) ;
+        //TransformRandom( mp_block_random.get() , m_n_quantum ) ;
+        ( *mpShift )( mp_block_random.get() ) ;
         for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
             mp_block_dest[i] = mp_block_source[i] ^ mp_block_random[i] ;
         
@@ -378,6 +401,8 @@ void GammaCrypt::Crypt()
 
 void GammaCrypt::SetBlockSize( unsigned block_size )
 {
+    if ( block_size > 32 )
+        block_size = 32 ;
     mb_need_init_blocksize = false ;
     unsigned temp = block_size ;
     unsigned log2 = 0 ; 
@@ -386,7 +411,7 @@ void GammaCrypt::SetBlockSize( unsigned block_size )
     for ( unsigned i = 0 ; i < log2 ; ++i )
         m_block_size <<= 1 ;
     if ( m_block_size < 8)
-        m_block_size = 64 ;
+        m_block_size = 8 ;
 }
 
 void GammaCrypt::DisplayInfo()

@@ -11,10 +11,6 @@ typedef unsigned t_block[] ;
 // out: randoms
 void GenerateRandoms( const unsigned rsize , t_block randoms) ;
 
-// transform random ( as a simple pseudorandom number generator)
-//in:   n_quantum - size of block
-//in:   m_block_random
-//out:  m_block_random - transormed random
 void TransformRandom( unsigned * block_random , const size_t n_quantum ) ;
 
 void TransformRandomCycle( unsigned * block_random , const size_t n_quantum ) ;

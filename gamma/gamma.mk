@@ -13,7 +13,7 @@ CurrentFileName        :=
 CurrentFilePath        :=
 CurrentFileFullPath    :=
 User                   :=anton
-Date                   :=26/08/19
+Date                   :=27/08/19
 CodeLitePath           :=/home/anton/.codelite
 LinkerName             :=/usr/bin/g++
 SharedObjectLinkerName :=/usr/bin/g++ -shared -fPIC
@@ -60,7 +60,7 @@ AS       := /usr/bin/as
 ## User defined environment variables
 ##
 CodeLiteDir:=/usr/share/codelite
-Objects0=$(IntermediateDirectory)/main.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_randomroutines.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_helper.cpp$(ObjectSuffix) $(IntermediateDirectory)/up_Display_ConsoleDisplay_src_display.cpp$(ObjectSuffix) 
+Objects0=$(IntermediateDirectory)/main.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_randomroutines.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_helper.cpp$(ObjectSuffix) $(IntermediateDirectory)/up_Display_ConsoleDisplay_src_display.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_LFSR.cpp$(ObjectSuffix) 
 
 
 
@@ -130,6 +130,14 @@ $(IntermediateDirectory)/up_Display_ConsoleDisplay_src_display.cpp$(DependSuffix
 
 $(IntermediateDirectory)/up_Display_ConsoleDisplay_src_display.cpp$(PreprocessSuffix): ../Display/ConsoleDisplay/src/display.cpp
 	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/up_Display_ConsoleDisplay_src_display.cpp$(PreprocessSuffix) ../Display/ConsoleDisplay/src/display.cpp
+
+$(IntermediateDirectory)/src_LFSR.cpp$(ObjectSuffix): src/LFSR.cpp $(IntermediateDirectory)/src_LFSR.cpp$(DependSuffix)
+	$(CXX) $(IncludePCH) $(SourceSwitch) "/home/anton/1/cpp/2019/00armo/gamma/src/LFSR.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_LFSR.cpp$(ObjectSuffix) $(IncludePath)
+$(IntermediateDirectory)/src_LFSR.cpp$(DependSuffix): src/LFSR.cpp
+	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/src_LFSR.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/src_LFSR.cpp$(DependSuffix) -MM src/LFSR.cpp
+
+$(IntermediateDirectory)/src_LFSR.cpp$(PreprocessSuffix): src/LFSR.cpp
+	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/src_LFSR.cpp$(PreprocessSuffix) src/LFSR.cpp
 
 
 -include $(IntermediateDirectory)/*$(DependSuffix)

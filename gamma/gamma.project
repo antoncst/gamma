@@ -13,12 +13,14 @@
     <File Name="src/randomroutines.cpp"/>
     <File Name="src/helper.cpp"/>
     <File Name="../Display/ConsoleDisplay/src/display.cpp"/>
+    <File Name="src/LFSR.cpp"/>
   </VirtualDirectory>
   <VirtualDirectory Name="include">
     <File Name="include/gamma.h"/>
     <File Name="include/randomroutines.h"/>
     <File Name="include/helper.h"/>
     <File Name="../Display/ConsoleDisplay/include/display.h"/>
+    <File Name="include/LFSR.h"/>
   </VirtualDirectory>
   <Settings Type="Executable">
     <GlobalSettings>

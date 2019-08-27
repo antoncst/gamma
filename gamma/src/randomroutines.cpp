@@ -304,61 +304,6 @@ void TransformRandomCycle( unsigned * block_random , const size_t n_quantum )
 }
 
 
-void TransformRandom( unsigned * block_random , const size_t n_quantum )
-{
-        assert( block_random != nullptr ) ;
-    unsigned first_bit = block_random[0] & 0x1 ;
-
-    for ( size_t i = 0 ; i < n_quantum ; i++ )
-    {
-        //                          1st bit                     2nd bit                             reset 1st bit
-        block_random[i] = ( (block_random[i] & 0x1 ) ^ (( block_random[i] & 0x2 ) >>1) ) | ( block_random[i] & 0xFFFFFFFE ) ;
-        //                          2st bit                     3d bit                              reset 2st bit
-        block_random[i] = ( (block_random[i] & 0x2 ) ^ (( block_random[i] & 0x4 ) >>1)) | ( block_random[i] & 0xFFFFFFFD ) ;
-        //                          3d bit                      4th bit                             reset 3d bit
-        block_random[i] = ( (block_random[i] & 0x4 ) ^ (( block_random[i] & 0x8 ) >>1)) | ( block_random[i] & 0xFFFFFFFB ) ;
-        //                          4th bit                     5th bit                             reset 4th bit
-        block_random[i] = ( (block_random[i] & 0x8 ) ^ (( block_random[i] & 0x10 ) >>1)) | ( block_random[i] & 0xFFFFFFF7 ) ;
-        //                          5th bit                     6th bit                             reset 5th bit
-        block_random[i] = ( (block_random[i] & 0x10 ) ^ (( block_random[i] & 0x20 ) >>1)) | ( block_random[i] & 0xFFFFFFEF ) ;
-        //                          6th bit                     7th bit                             reset 6th bit
-        block_random[i] = ( (block_random[i] & 0x20 ) ^ (( block_random[i] & 0x40 ) >>1)) | ( block_random[i] & 0xFFFFFFDF ) ;
-        //                          7th bit                     8th bit                             reset 7th bit
-        block_random[i] = ( (block_random[i] & 0x40 ) ^ (( block_random[i] & 0x80 ) >>1)) | ( block_random[i] & 0xFFFFFFBF ) ;
-        //                          8th bit                     9th bit                             reset 8th bit
-        block_random[i] = ( (block_random[i] & 0x80 ) ^ (( block_random[i] & 0x100 ) >>1)) | ( block_random[i] & 0xFFFFFF7F ) ;
-        // etc
-        block_random[i] = ((block_random[i] & 0x100 ) ^ (( block_random[i] & 0x200 )>>1)) | ( block_random[i] &    0xFFFFFEFF ) ;
-        block_random[i] = ((block_random[i] & 0x200 ) ^ (( block_random[i] & 0x400 )>>1)) | ( block_random[i] &    0xFFFFFDFF ) ;
-        block_random[i] = ((block_random[i] & 0x400 ) ^ (( block_random[i] & 0x800 )>>1)) | ( block_random[i] &    0xFFFFFBFF ) ;
-        block_random[i] = ((block_random[i] & 0x800 ) ^ (( block_random[i] & 0x1000 )>>1)) | ( block_random[i] &   0xFFFFF7FF ) ;
-        block_random[i] = ((block_random[i] & 0x1000 ) ^ (( block_random[i] & 0x2000 )>>1)) | ( block_random[i] &  0xFFFFEFFF ) ;
-        block_random[i] = ((block_random[i] & 0x2000 ) ^ (( block_random[i] & 0x4000 )>>1)) | ( block_random[i] &  0xFFFFDFFF ) ;
-        block_random[i] = ((block_random[i] & 0x4000 ) ^ (( block_random[i] & 0x8000 )>>1)) | ( block_random[i] &  0xFFFFBFFF ) ;
-        block_random[i] = ((block_random[i] & 0x8000 ) ^ (( block_random[i] & 0x10000 )>>1)) | ( block_random[i] & 0xFFFF7FFF ) ;
-
-        block_random[i] = ((block_random[i] & 0x10000 ) ^ (( block_random[i] &  0x20000 )>>1)) | ( block_random[i] &   0xFFFEFFFF ) ;
-        block_random[i] = ((block_random[i] & 0x20000 ) ^ (( block_random[i] &  0x40000 )>>1)) | ( block_random[i] &   0xFFFDFFFF ) ;
-        block_random[i] = ((block_random[i] & 0x40000 ) ^ (( block_random[i] &  0x80000 )>>1)) | ( block_random[i] &   0xFFFBFFFF ) ;
-        block_random[i] = ((block_random[i] & 0x80000 ) ^ (( block_random[i] &  0x100000 )>>1)) | ( block_random[i] &  0xFFF7FFFF ) ;
-        block_random[i] = ((block_random[i] & 0x100000 ) ^ (( block_random[i] & 0x200000 )>>1)) | ( block_random[i] &  0xFFEFFFFF ) ;
-        block_random[i] = ((block_random[i] & 0x200000 ) ^ ((block_random[i] &  0x400000 )>>1)) | ( block_random[i] &  0xFFDFFFFF ) ;
-        block_random[i] = ((block_random[i] & 0x400000 ) ^ (( block_random[i] & 0x800000 )>>1)) | ( block_random[i] &  0xFFBFFFFF ) ;
-        block_random[i] = ((block_random[i] & 0x800000 ) ^ (( block_random[i] & 0x1000000 )>>1)) | ( block_random[i] & 0xFF7FFFFF ) ;
-
-        block_random[i] = ((block_random[i] & 0x1000000 ) ^ (( block_random[i] &  0x2000000 )>>1)) | ( block_random[i] &   0xFEFFFFFF ) ;
-        block_random[i] = ((block_random[i] & 0x2000000 ) ^ (( block_random[i] &  0x4000000 )>>1)) | ( block_random[i] &   0xFDFFFFFF ) ;
-        block_random[i] = ((block_random[i] & 0x4000000 ) ^ (( block_random[i] &  0x8000000 )>>1)) | ( block_random[i] &   0xFBFFFFFF ) ;
-        block_random[i] = ((block_random[i] & 0x8000000 ) ^ (( block_random[i] &  0x10000000 )>>1)) | ( block_random[i] &  0xF7FFFFFF ) ;
-        block_random[i] = ((block_random[i] & 0x10000000 ) ^ (( block_random[i] & 0x20000000 )>>1)) | ( block_random[i] &  0xEFFFFFFF ) ;
-        block_random[i] = ((block_random[i] & 0x20000000 ) ^ (( block_random[i] & 0x40000000 )>>1)) | ( block_random[i] &  0xDFFFFFFF ) ;
-        block_random[i] = ((block_random[i] & 0x40000000 ) ^ (( block_random[i] & 0x80000000 )>>1)) | ( block_random[i] &  0xBFFFFFFF ) ;
-        if ( i != n_quantum -1 )
-            block_random[i] = ((block_random[i] & 0x80000000 ) ^ (( block_random[i+1] & 0x1 ) << 31)) | ( block_random[i] & 0x7FFFFFFF ) ;
-    }
-    block_random[n_quantum -1] = ((block_random[n_quantum -1] & 0x80000000 ) ^ ( first_bit <<31 )) | ( block_random[n_quantum -1] & 0x7FFFFFFF ) ;
-}
-
 
 //------------- REPOSITIONING --------------------
 
