@@ -307,29 +307,10 @@ void TransformRandomCycle( unsigned * block_random , const size_t n_quantum )
 
 //------------- REPOSITIONING --------------------
 
-
-void BitsetItmesArray::Init( size_t block_size )
+void RearrangeSlices::Init( size_t block_size )
 {
-    block_size_bytes = block_size ;
-    // есть блок размером m_block_size байт
-    //допустим переставляем биты, тогда нужно адресовать :
-    max_index = block_size_bytes * 8 ;
-    // Для хранения одного индекса нужно log2 ( m_max_index ) бит ;
-    uint16_t temp = max_index ;
-    index_size_bits = 0 ; 
-    while ( temp >>= 1 ) index_size_bits ++ ;
-    // Для хранения всех индексов нужно
-    matrix_size_bits = max_index * index_size_bits ;
-    matrix_size_bytes = matrix_size_bits / 8 ;
-    if ( matrix_size_bits % 8 != 0 ) // это вряд ли, но на всякий случай
-        matrix_size_bytes++ ;
-        
-    // выделим память и инициализируем BitArray
-    m_array = std::make_unique<unsigned char[]>( matrix_size_bytes ) ;
-
-    m_matrixBA.Init( m_array.get() ) ;
-
-}
+    m_BIarray.Init( block_size ) ;
+} 
 
 void RearrangeSlices::InverseRearrangeMatrix()
 {
@@ -415,6 +396,31 @@ void RearrangeSlices::Rearrange( unsigned char * p_block , uint16_t bytes_read ,
     }
     memcpy(  p_block , temp_block , m_BIarray.block_size_bytes ) ; //todo realize move semantic
     
+}
+
+
+
+void BitsetItmesArray::Init( size_t block_size )
+{
+    block_size_bytes = block_size ;
+    // есть блок размером m_block_size байт
+    //допустим переставляем биты, тогда нужно адресовать :
+    max_index = block_size_bytes * 8 ;
+    // Для хранения одного индекса нужно log2 ( m_max_index ) бит ;
+    uint16_t temp = max_index ;
+    index_size_bits = 0 ; 
+    while ( temp >>= 1 ) index_size_bits ++ ;
+    // Для хранения всех индексов нужно
+    matrix_size_bits = max_index * index_size_bits ;
+    matrix_size_bytes = matrix_size_bits / 8 ;
+    if ( matrix_size_bits % 8 != 0 ) // это вряд ли, но на всякий случай
+        matrix_size_bytes++ ;
+        
+    // выделим память и инициализируем BitArray
+    m_array = std::make_unique<unsigned char[]>( matrix_size_bytes ) ;
+
+    m_matrixBA.Init( m_array.get() ) ;
+
 }
 
 inline uint16_t BitsetItmesArray::operator []( uint16_t index ) noexcept
@@ -530,7 +536,3 @@ inline void BitArray::set(unsigned index, uint16_t nbits, uint16_t value ) noexc
     }
 } ;
 
-void RearrangeSlices::Init( size_t block_size )
-{
-    m_BIarray.Init( block_size ) ;
-} ;

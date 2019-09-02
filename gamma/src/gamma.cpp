@@ -62,8 +62,12 @@ void GammaCrypt::Initialize()
 */
     if ( mb_need_init_blocksize )
     {
-        if ( m_header.source_file_size >= 1048575 ) // 1M - 
-            m_block_size = 32 ;
+        if ( m_header.source_file_size >= 67108864 ) // 64M -
+            m_block_size = 128 ;
+        else if ( m_header.source_file_size >= 16777216 ) // 16M - 64M
+            m_block_size = 64 ;
+        else if ( m_header.source_file_size >= 1048576 ) // 1M - 16M
+            m_block_size = 16 ;
         else if ( m_header.source_file_size >= 4096 ) // 4K - 1M
             m_block_size = 16 ;
         else        // 0 - 4K
@@ -71,9 +75,13 @@ void GammaCrypt::Initialize()
     }
 
     // init mpShift
-    if ( m_header.source_file_size >= 1048575 ) // 1M - 
+    if ( m_block_size == 128 ) // 64M -
+        mpShift = Shift1024 ;
+    else if ( m_block_size == 64 ) // 16M - 
+        mpShift = Shift512 ;
+    else if ( m_block_size ==32 ) // 1M - 16M
         mpShift = Shift256 ;
-    else if ( m_header.source_file_size >= 4096 ) // 4K - 1M
+    else if ( m_block_size == 16 ) // 4K - 1M
         mpShift = Shift128 ;
     else        // 0 - 4K
         mpShift = Shift64 ;
@@ -81,11 +89,11 @@ void GammaCrypt::Initialize()
     m_n_quantum = m_block_size / m_quantum_size ;
     
     // allocate memory
-    mp_block_password = make_unique< t_block >( m_n_quantum ) ;
-    mp_block_random   = make_unique< t_block >( m_n_quantum + 1 ) ; // to transform Random block it is required one quantum more (therefore "+1")
+    mp_block_password  = make_unique< t_block >( m_n_quantum ) ;
+    mp_block_random    = make_unique< t_block >( m_n_quantum + 1 ) ; // to transform Random block it is required one quantum more (therefore "+1")
     mp_block_random3   = make_unique< t_block >( m_n_quantum + 1 ) ; // to transform Random block it is required one quantum more (therefore "+1")
-    mp_block_source   = make_unique< t_block >( m_n_quantum ) ;
-    mp_block_dest     = make_unique< t_block >( m_n_quantum ) ;
+    mp_block_source    = make_unique< t_block >( m_n_quantum ) ;
+    mp_block_dest      = make_unique< t_block >( m_n_quantum ) ;
 
     // password block initialization
     memset( mp_block_password.get() , 0 , m_block_size ) ;
@@ -101,6 +109,10 @@ void GammaCrypt::Initialize()
         i += bytes_to_copy ;
     }
     assert( i == m_block_size ) ;
+    // transform psw block in cycle
+    // This results in a delay that is usefull against 'dictionary' atack
+    for ( unsigned i = 0 ; i < 4093 ; ++i )
+        ( *mpShift )( mp_block_password.get() ) ;
 }
 
 void GammaCrypt::Encrypt()
@@ -401,8 +413,8 @@ void GammaCrypt::Crypt()
 
 void GammaCrypt::SetBlockSize( unsigned block_size )
 {
-    if ( block_size > 32 )
-        block_size = 32 ;
+    if ( block_size > 128 )
+        block_size = 128 ;
     mb_need_init_blocksize = false ;
     unsigned temp = block_size ;
     unsigned log2 = 0 ; 
@@ -417,8 +429,8 @@ void GammaCrypt::SetBlockSize( unsigned block_size )
 void GammaCrypt::DisplayInfo()
 {
     ostringstream oss ;
-    oss << "\n source file size: " << m_header.source_file_size ;
-    oss << "\n block size: " << m_block_size ;
+    oss << "\n source file size (bytes): " << m_header.source_file_size ;
+    oss << "\n block size (bytes): " << m_block_size ;
     oss << "\n matrix size (bytes): " << m_Reposition.m_BIarray.matrix_size_bytes ;
     oss << "\n number of matrix elements: " << m_Reposition.m_BIarray.max_index ;
     oss << "\n size of one matrix element (bits): " << m_Reposition.m_BIarray.index_size_bits ;
