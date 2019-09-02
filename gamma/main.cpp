@@ -47,7 +47,7 @@ int main(int argc, char **argv)
     assert( ofs.is_open() ) ;
 
     GammaCrypt gm( ifs , ofs , password ) ;
-    
+    //std::thread::hardware_concurrency
     try 
     {
         if ( parser.action == parser.none || parser.action == parser.encrypt )

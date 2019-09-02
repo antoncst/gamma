@@ -46,7 +46,7 @@ private:
     const std::string & m_password ;
     
     std::unique_ptr< t_block > mp_block_random ; // mp_...   m - member, p - pointer
-    std::unique_ptr< t_block > mp_block_random3 ;
+    //obsolete: std::unique_ptr< t_block > mp_block_random3 ;
     std::unique_ptr< t_block > mp_block_password ;
     std::unique_ptr< t_block > mp_block_source ;
     std::unique_ptr< t_block > mp_block_dest ;

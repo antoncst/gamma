@@ -366,12 +366,6 @@ void RearrangeSlices::MakeRearrangeMatrix()
 void RearrangeSlices::Rearrange( unsigned char * p_block , uint16_t bytes_read , unsigned char * temp_block ) noexcept
 {
     
-    if ( bytes_read < m_BIarray.block_size_bytes )
-    {
-        // тогда остаток блока надо добить нулями
-        memset( p_block + bytes_read, 0 , m_BIarray.block_size_bytes - bytes_read ) ;
-    }
-    
     memset( temp_block , 0 , m_BIarray.block_size_bytes ) ; // todo out away
 
     BitArray src_BA( p_block ) ;
