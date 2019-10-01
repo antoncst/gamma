@@ -33,9 +33,10 @@ private:
     //read header from input file
     void ReadHead() ;
     
-    //read keys, matrix etc.
+    //read keys, pma etc.
     void ReadOverheadData() ;
 
+    //obsolete:
     // actually crypt algorythm
     // called from Encrypt(), Decrypt()
     void Crypt() ;
@@ -51,12 +52,13 @@ private:
     std::unique_ptr< t_block > mp_block_source ;
     std::unique_ptr< t_block > mp_block_dest ;
     
-    RearrangeSlices m_Reposition ;
+    Permutate m_Permutate ;
 
-    void Matrix_Xor_Password( uint16_t * pmatrix_in , unsigned * pmatrix_out ) ;
+    void PMA_Xor_Password( uint16_t * p_pma_in , unsigned * p_pma_out ) ;
     
     void DisplayInfo() ;
     
+    // Pointer to LFSR function
     void ( * mpShift )( unsigned * p_block ) ;
     
     struct t_header
@@ -64,13 +66,14 @@ private:
         // 0x00
         uint8_t major_ver = 0x00 ;
         uint8_t minor_ver = 0x00 ;
-        // 0x2
+        // 0x02
         uint16_t data_offset ;  // начало блока ключа.
                                 // относительно начала файла (заголовка) , то есть размер заголовка
-        // 0x4
-        uint64_t source_file_size ; // размер исходного файла
+        // 0x04
         uint16_t h_block_size ; // размер блока (ключа и пр.). h_ (header) - чтобы не путаться с другими "block_size"
-        uint16_t reserved2 = 0 ;
+        uint16_t reserved = 0 ;
+        // 0x08
+        uint64_t source_file_size ; // размер исходного файла
     } m_header ; 
 } ;
 

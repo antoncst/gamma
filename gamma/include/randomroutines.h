@@ -46,27 +46,35 @@ class BitsetItmesArray
 public:
     void Init( size_t block_size ) ;
     
-    inline uint16_t operator[] (uint16_t index) noexcept ;
+    /*inline*/ uint16_t operator[] (uint16_t index) noexcept ; // to do inline
     inline void set( uint16_t index , uint16_t val ) noexcept ;
 
     std::unique_ptr< unsigned char[] > m_array ;
-    unsigned max_index ; //  that is matrix length, the numbers of elements
-    unsigned matrix_size_bits ;
-    uint16_t matrix_size_bytes ;
+    unsigned max_index ; //  that is permutation array length, the numbers of elements
+    // permutation array size bits
+    unsigned pma_size_bits ;
+    // permutation array size bytes
+    uint16_t pma_size_bytes ;
     uint16_t index_size_bits ;
     uint16_t block_size_bytes ;
-    BitArray m_matrixBA ;
+    // Массив перестановок как массив битов
+    BitArray m_pmaBA ;
 } ;
 
 
-class RearrangeSlices
+class Permutate
 {
 public:
+    // массив перестановок (развернутый: )
+    std::unique_ptr< uint16_t[] > e_array ; // expanded array
+
     BitsetItmesArray m_BIarray ;
 
     void Init( size_t block_size ) ;
-    void MakeRearrangeMatrix() ;
-    void InverseRearrangeMatrix() ;
+    // Make Permutation Array
+    void MakePermutArr() ;
+    void InversePermutArr() ;
     void Rearrange( unsigned char * p_block , uint16_t bytes_read , unsigned char * temp_block ) noexcept ;
+    void eRearrange( unsigned char * p_block , unsigned char * temp_block ) noexcept ;
 
 } ;

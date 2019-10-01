@@ -119,7 +119,7 @@ void GenRandByHdd( unsigned const N , t_block rvals )
         std::ofstream ofs ;
         ofs.open( "temp_1", std::ios::out | std::ios::trunc) ;
         ofs << "ttt" ;
-        std::this_thread::sleep_for( std::chrono::microseconds( 10 ) ) ;
+        std::this_thread::sleep_for( std::chrono::microseconds( 20 ) ) ;
         ofs.flush() ;
         ofs.close() ;
         
@@ -135,7 +135,7 @@ void GenRandByHdd( unsigned const N , t_block rvals )
             std::ofstream ofs2 ;
             ofs2.open( "temp_2", std::ios::out | std::ios::trunc) ;
             ofs2 << "ttt" ;
-            std::this_thread::sleep_for( std::chrono::microseconds( 10 ) ) ;
+            std::this_thread::sleep_for( std::chrono::microseconds( 20 ) ) ;
             ofs2.flush() ;
             ofs2.close() ;
 
@@ -162,7 +162,7 @@ int DetermineHighSetBit( unsigned const val )
             if ( (val & umask) > 0 )
                 return n ;
     }
-    throw "error: too small random value to processing DetermineHighSetBit" ;
+    throw "error: too small random value to perform DetermineHighSetBit" ;
 }
 
 // Вычислить не среднее арифметическое, а "четверть арифметическое", то есть среднее африфметическое пополам
@@ -307,26 +307,27 @@ void TransformRandomCycle( unsigned * block_random , const size_t n_quantum )
 
 //------------- REPOSITIONING --------------------
 
-void RearrangeSlices::Init( size_t block_size )
+void Permutate::Init( size_t block_size )
 {
     m_BIarray.Init( block_size ) ;
+    e_array = std::make_unique< uint16_t[] >( m_BIarray.max_index) ;
 } 
 
-void RearrangeSlices::InverseRearrangeMatrix()
+void Permutate::InversePermutArr()
 {
-    //std::vector< uint16_t > inverse_matrix ;
-    BitsetItmesArray inverse_matrix ;
-    inverse_matrix.Init( m_BIarray.block_size_bytes  ) ;
+    //std::vector< uint16_t > inverse_pma ;
+    BitsetItmesArray inverse_pma ;
+    inverse_pma.Init( m_BIarray.block_size_bytes  ) ;
     
-    //inverse_matrix.reserve( max_index ) ;
+    //inverse_pma.reserve( max_index ) ;
     for ( unsigned i = 0 ; i < m_BIarray.max_index ;  ++i )
     {
-        inverse_matrix.set( m_BIarray[ i ] , i ) ;
+        inverse_pma.set( m_BIarray[ i ] , i ) ;
     }
-    memcpy( m_BIarray.m_array.get() , inverse_matrix.m_array.get() , m_BIarray.matrix_size_bytes ) ; // todo move
+    memcpy( m_BIarray.m_array.get() , inverse_pma.m_array.get() , m_BIarray.pma_size_bytes ) ; // todo move
 } 
 
-void RearrangeSlices::MakeRearrangeMatrix()
+void Permutate::MakePermutArr()
 {
     //сгенерируем  список индексов
     std::vector< uint16_t > indexes_container ;
@@ -334,15 +335,13 @@ void RearrangeSlices::MakeRearrangeMatrix()
     for ( uint16_t i = 0 ; i < m_BIarray.max_index ; ++i )
         indexes_container.push_back( i ) ;
 
-    //display_str("Generating randoms for matrix ...") ;
-
     BitsetItmesArray BI_rands ;
     BI_rands.Init( /*N_bytes*/ m_BIarray.block_size_bytes ) ;
 
-    assert( m_BIarray.matrix_size_bytes % 4 == 0 ) ;
-    GenerateRandoms( m_BIarray.matrix_size_bytes / 4 , ( unsigned * ) BI_rands.m_array.get() ) ;
+    assert( m_BIarray.pma_size_bytes % 4 == 0 ) ;
+    GenerateRandoms( m_BIarray.pma_size_bytes / 4 , ( unsigned * ) BI_rands.m_array.get() ) ;
     
-    //display_str("making matrix...") ;
+    //display_str("making pma...") ;
     for ( unsigned i = 0 ; i < m_BIarray.max_index ; ++i )
     {
         // вместо rands - unique_ptr< t_block > 
@@ -356,14 +355,15 @@ void RearrangeSlices::MakeRearrangeMatrix()
         // m_array[ i ] =  indexes_deque[ rr ] ; // 
         
         uint16_t rr = ( r % ( m_BIarray.max_index - i ) ) ;
-        //repostn_matrix[ i ] = indexes[ rr ] ;
+        //repostn_pma[ i ] = indexes[ rr ] ;
         
         m_BIarray.set( i ,  indexes_container[ rr ] ) ;
+        e_array.get() [ i ] = indexes_container[ rr ] ;
         indexes_container.erase( indexes_container.begin() + rr ) ;
     }
 } ;
 
-void RearrangeSlices::Rearrange( unsigned char * p_block , uint16_t bytes_read , unsigned char * temp_block ) noexcept
+void Permutate::Rearrange( unsigned char * p_block , uint16_t bytes_read , unsigned char * temp_block ) noexcept
 {
     
     memset( temp_block , 0 , m_BIarray.block_size_bytes ) ; // todo out away
@@ -373,8 +373,8 @@ void RearrangeSlices::Rearrange( unsigned char * p_block , uint16_t bytes_read ,
     
     for ( uint16_t i = 0 ; i < m_BIarray.max_index ; ++i )
     {
-        //uint16_t byte_offset_src = repostn_matrix[ i ] / 8 ;
-        //uint16_t bit_offset_src = repostn_matrix[ i ] % 8 ;
+        //uint16_t byte_offset_src = repostn_pma[ i ] / 8 ;
+        //uint16_t bit_offset_src = repostn_pma[ i ] % 8 ;
         
         //uint16_t byte_offset_res = i / 8 ;
         //uint16_t bit_offset_res = i % 8 ;
@@ -387,6 +387,34 @@ void RearrangeSlices::Rearrange( unsigned char * p_block , uint16_t bytes_read ,
         //res_block[ byte_offset_res ] |= mask_res ;
         //res_BA.setbit( i , src_BA[ m_array[ i ] ] ) ;
         res_BA.setbit( i , src_BA[ m_BIarray[ i ] ] ) ;
+    }
+    memcpy(  p_block , temp_block , m_BIarray.block_size_bytes ) ; //todo realize move semantic
+    
+}
+
+void Permutate::eRearrange( unsigned char * p_block , unsigned char * temp_block ) noexcept
+{
+
+    memset( temp_block , 0 , m_BIarray.block_size_bytes ) ; // todo out away , нельзя убирать, т к биты задаются операцией |=, т е исходный бит д.б. сброшен
+
+    //BitArray res_BA( temp_block ) ;
+
+    for ( uint16_t i = 0 ; i < m_BIarray.max_index ; ++i )
+    {
+        uint16_t byte_offset_src = e_array.get()[ i ] / 8 ;
+        uint16_t bit_offset_src = e_array.get()[ i ] % 8 ;
+        
+        uint16_t byte_offset_res = i / 8 ;
+        uint16_t bit_offset_res = i % 8 ;
+        
+        char mask_src = 1 << bit_offset_src ;
+        
+        bool res_bit = p_block[byte_offset_src] & mask_src ;
+        char mask_res = char ( res_bit ) << bit_offset_res ;
+        
+        temp_block[ byte_offset_res ] |= mask_res ;
+        //res_BA.setbit( i , src_BA[ m_array[ i ] ] ) ;
+        //res_BA.setbit( i , src_BA[ m_BIarray[ i ] ] ) ;
     }
     memcpy(  p_block , temp_block , m_BIarray.block_size_bytes ) ; //todo realize move semantic
     
@@ -405,27 +433,27 @@ void BitsetItmesArray::Init( size_t block_size )
     index_size_bits = 0 ; 
     while ( temp >>= 1 ) index_size_bits ++ ;
     // Для хранения всех индексов нужно
-    matrix_size_bits = max_index * index_size_bits ;
-    matrix_size_bytes = matrix_size_bits / 8 ;
-    if ( matrix_size_bits % 8 != 0 ) // это вряд ли, но на всякий случай
-        matrix_size_bytes++ ;
+    pma_size_bits = max_index * index_size_bits ;
+    pma_size_bytes = pma_size_bits / 8 ;
+    if ( pma_size_bits % 8 != 0 ) // это вряд ли, но на всякий случай
+        pma_size_bytes++ ;
         
     // выделим память и инициализируем BitArray
-    m_array = std::make_unique<unsigned char[]>( matrix_size_bytes ) ;
+    m_array = std::make_unique<unsigned char[]>( pma_size_bytes ) ;
 
-    m_matrixBA.Init( m_array.get() ) ;
+    m_pmaBA.Init( m_array.get() ) ;
 
 }
 
-inline uint16_t BitsetItmesArray::operator []( uint16_t index ) noexcept
+/*inline*/ uint16_t BitsetItmesArray::operator []( uint16_t index ) noexcept
 {
-    return m_matrixBA.get( index * index_size_bits , index_size_bits ) ;
+    return m_pmaBA.get( index * index_size_bits , index_size_bits ) ;
 }
 
 inline void BitsetItmesArray::set( uint16_t index , uint16_t val ) noexcept
 {
     assert( index < max_index ) ;
-    m_matrixBA.set( index * index_size_bits , index_size_bits , val ) ;
+    m_pmaBA.set( index * index_size_bits , index_size_bits , val ) ;
 }
 
 

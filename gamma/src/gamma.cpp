@@ -67,7 +67,7 @@ void GammaCrypt::Initialize()
         else if ( m_header.source_file_size >= 16777216 ) // 16M - 64M
             m_block_size = 64 ;
         else if ( m_header.source_file_size >= 1048576 ) // 1M - 16M
-            m_block_size = 16 ;
+            m_block_size = 32 ;
         else if ( m_header.source_file_size >= 4096 ) // 4K - 1M
             m_block_size = 16 ;
         else        // 0 - 4K
@@ -79,7 +79,7 @@ void GammaCrypt::Initialize()
         mpShift = Shift1024 ;
     else if ( m_block_size == 64 ) // 16M - 
         mpShift = Shift512 ;
-    else if ( m_block_size ==32 ) // 1M - 16M
+    else if ( m_block_size == 32 ) // 1M - 16M
         mpShift = Shift256 ;
     else if ( m_block_size == 16 ) // 4K - 1M
         mpShift = Shift128 ;
@@ -90,10 +90,17 @@ void GammaCrypt::Initialize()
     
     // allocate memory
     mp_block_password  = make_unique< t_block >( m_n_quantum ) ;
-    mp_block_random    = make_unique< t_block >( m_n_quantum * 3 ) ; // obsolete: to transform Random block it is required one quantum more (therefore "+1")
-    // obsolete: mp_block_random3   = make_unique< t_block >( m_n_quantum + 1 ) ;
+    // obsolete: mp_block_random3   = make_unique< t_block >( m_n_quantum + 1 ) ; // obsolete: to transform Random block it is required one quantum more (therefore "+1")
     mp_block_source    = make_unique< t_block >( m_n_quantum ) ;
     mp_block_dest      = make_unique< t_block >( m_n_quantum ) ;
+
+    // block random
+    // N = m_n_quantum / 4 
+    // offset in bytes:
+    //    KEY1           KEY2                PMA1                             PMA2                         tail KEY
+    // 0  ... N-1   N  ...  N*2-1   N*2...N*2+PMAsizeBytes-1   N*2+PMAsizeBytes...N*2+PMAsizeBytes*2-1    N*2+PMAsizeBytes*2 ... N*2+PMAsizeBytes*2+tailSize-1
+    mp_block_random    = make_unique< t_block >( m_n_quantum * 3 + m_Permutate.m_BIarray.pma_size_bytes ) ; 
+
 
     // password block initialization
     memset( mp_block_password.get() , 0 , m_block_size ) ;
@@ -145,16 +152,16 @@ void GammaCrypt::Encrypt()
             std::cout << "Duration: " << drtn << std::endl ;
             //
     
-    display_str("making reposition matrix...") ;
+    display_str("making permutation array...") ;
             // time mesaure
             mcs1 = std::chrono::high_resolution_clock::now() ;
             //
-    m_Reposition.Init( m_block_size ) ;
-    m_Reposition.MakeRearrangeMatrix() ;
-        // cout matrix
+    m_Permutate.Init( m_block_size ) ;
+    m_Permutate.MakePermutArr() ;
+        // cout pma
         /*std::cout << "\n" ;
-        for ( int i = 0 ; i < m_Reposition.max_index ; i ++)
-            std::cout << m_Reposition[ i ] << ' ' ;
+        for ( int i = 0 ; i < m_Permutate.max_index ; i ++)
+            std::cout << m_Permutate[ i ] << ' ' ;
         std::cout << std::endl ;*/
 
             // time mesaure
@@ -178,7 +185,8 @@ void GammaCrypt::Encrypt()
             mcs1 = std::chrono::high_resolution_clock::now() ;
             //
 
-    auto temp_block = std::make_unique< unsigned char[] >( m_Reposition.m_BIarray.block_size_bytes ) ; // for Rearrange Matrix
+    auto temp_block = std::make_unique< unsigned char[] >( m_Permutate.m_BIarray.block_size_bytes ) ; // for PMA
+    auto e_temp_block = std::make_unique< uint16_t[] >( m_Permutate.m_BIarray.max_index ) ;
 
     uint16_t bytes_read ;
 
@@ -203,7 +211,7 @@ void GammaCrypt::Encrypt()
             mp_block_dest[i] = mp_block_source[i] ^ mp_block_random[i] ;
         
         //REPOSITIONING
-        m_Reposition.Rearrange( (unsigned char*) mp_block_dest.get() , bytes_read , temp_block.get() ) ;
+        m_Permutate.eRearrange( (unsigned char*) mp_block_dest.get() , temp_block.get() ) ;
         
         // XOR3
         ( *mpShift )( mp_block_random.get() + m_n_quantum ) ;
@@ -249,7 +257,7 @@ void GammaCrypt::Decrypt()
     mb_need_init_blocksize = false ;
     
     Initialize() ;
-    m_Reposition.Init( m_block_size ) ;
+    m_Permutate.Init( m_block_size ) ;
     ReadOverheadData() ;
     
     DisplayInfo() ;
@@ -259,7 +267,7 @@ void GammaCrypt::Decrypt()
         assert( mp_block_source != nullptr ) ;
         assert( mp_block_dest != nullptr ) ;
 
-    auto temp_block = std::make_unique< unsigned char[] >( m_Reposition.m_BIarray.block_size_bytes ) ; // for Rearrange Matrix
+    auto temp_block = std::make_unique< unsigned char[] >( m_Permutate.m_BIarray.block_size_bytes ) ; // for PMA
 
     int64_t i = m_header.source_file_size ;
     while ( i > 0 )
@@ -277,7 +285,7 @@ void GammaCrypt::Decrypt()
         
         //REPOSITIONING
         
-        m_Reposition.Rearrange( ( unsigned char*) mp_block_source.get() , bytes_read , temp_block.get() ) ;
+        m_Permutate.eRearrange( ( unsigned char*) mp_block_source.get() , temp_block.get() ) ;
         // XOR1
         ( *mpShift )( mp_block_random.get() ) ;
         for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
@@ -335,20 +343,26 @@ void GammaCrypt::ReadOverheadData()
     for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
         mp_block_random[ i + m_n_quantum ] = block_key[i] ^ mp_block_password[i] ;
 
-    // Matrix
-    m_ifs.read( (char*) m_Reposition.m_BIarray.m_array.get() , m_Reposition.m_BIarray.matrix_size_bytes ) ;
-    if ( (unsigned) m_ifs.gcount() <  m_Reposition.m_BIarray.matrix_size_bytes )
-        throw ("error: File too short, missing matrix block") ;
+    // Permutation Array
+    m_ifs.read( (char*) m_Permutate.m_BIarray.m_array.get() , m_Permutate.m_BIarray.pma_size_bytes ) ;
+    if ( (unsigned) m_ifs.gcount() <  m_Permutate.m_BIarray.pma_size_bytes )
+        throw ("error: File too short, missing permutation array block") ;
         
-    unsigned block_matrix_size_words = m_Reposition.m_BIarray.matrix_size_bytes / sizeof(unsigned) ;
-    if ( m_Reposition.m_BIarray.matrix_size_bytes % sizeof( unsigned ) != 0  )
-        block_matrix_size_words++ ;
+    unsigned block_pma_size_words = m_Permutate.m_BIarray.pma_size_bytes / sizeof(unsigned) ;
+    if ( m_Permutate.m_BIarray.pma_size_bytes % sizeof( unsigned ) != 0  )
+        block_pma_size_words++ ;
 
-    auto block_matrix_xored = make_unique< unsigned[] >( block_matrix_size_words ) ;
-    Matrix_Xor_Password( (uint16_t *) m_Reposition.m_BIarray.m_array.get() , block_matrix_xored.get() ) ;
-    memcpy( m_Reposition.m_BIarray.m_array.get() , block_matrix_xored.get() , m_Reposition.m_BIarray.matrix_size_bytes ) ;
+    auto block_pma_xored = make_unique< unsigned[] >( block_pma_size_words ) ;
+    PMA_Xor_Password( (uint16_t *) m_Permutate.m_BIarray.m_array.get() , block_pma_xored.get() ) ;
+    memcpy( m_Permutate.m_BIarray.m_array.get() , block_pma_xored.get() , m_Permutate.m_BIarray.pma_size_bytes ) ;
 
-    m_Reposition.InverseRearrangeMatrix() ;
+    m_Permutate.InversePermutArr() ;
+    
+    // build e_array, aka Expanded in the memory
+    for ( uint16_t i = 0 ; i < m_Permutate.m_BIarray.max_index ; ++i )
+    {
+        m_Permutate.e_array.get()[ i ] = m_Permutate.m_BIarray[ i ] ;
+    }
 
 } ;
 
@@ -373,22 +387,22 @@ void GammaCrypt::WriteHead()
         block_key[i] = mp_block_random[ i + m_n_quantum ] ^ mp_block_password[i] ;
     m_ofs.write( (char*) block_key.get() , m_block_size ) ;
     
-    //Reposition matrix
+    //Permutation array
     // 1) XOR with password_block
-    unsigned block_matrix_size_words = m_Reposition.m_BIarray.matrix_size_bytes / sizeof(unsigned) ;
-    if ( m_Reposition.m_BIarray.matrix_size_bytes % sizeof( unsigned ) != 0  )
-        block_matrix_size_words++ ;
-    auto block_matrix_xored = make_unique< unsigned[] >( block_matrix_size_words ) ;
-    Matrix_Xor_Password( ( uint16_t * ) m_Reposition.m_BIarray.m_array.get() , block_matrix_xored.get() ) ;
+    unsigned block_pma_size_words = m_Permutate.m_BIarray.pma_size_bytes / sizeof(unsigned) ;
+    if ( m_Permutate.m_BIarray.pma_size_bytes % sizeof( unsigned ) != 0  )
+        block_pma_size_words++ ;
+    auto block_pma_xored = make_unique< unsigned[] >( block_pma_size_words ) ;
+    PMA_Xor_Password( ( uint16_t * ) m_Permutate.m_BIarray.m_array.get() , block_pma_xored.get() ) ;
     // 2) write to file
-    m_ofs.write( (char*) block_matrix_xored.get() , block_matrix_size_words * sizeof(unsigned) ) ;
+    m_ofs.write( (char*) block_pma_xored.get() , block_pma_size_words * sizeof(unsigned) ) ;
 }
 
-void GammaCrypt::Matrix_Xor_Password( uint16_t * pmatrix_in , unsigned * pmatrix_out )
+void GammaCrypt::PMA_Xor_Password( uint16_t * p_pma_in , unsigned * p_pma_out )
 {
-    // матрица должна быть выровняна по размеру блока, иначе block_password будет незаксоренный
-    unsigned N_blocks = m_Reposition.m_BIarray.matrix_size_bytes / m_block_size ;
-    if ( m_Reposition.m_BIarray.matrix_size_bytes % m_block_size != 0  )
+    // массив перестановок должен быть выровнен по размеру блока, иначе block_password будет незаксоренный
+    unsigned N_blocks = m_Permutate.m_BIarray.pma_size_bytes / m_block_size ;
+    if ( m_Permutate.m_BIarray.pma_size_bytes % m_block_size != 0  )
         N_blocks++ ;
     const unsigned block_size_words = m_block_size / sizeof( unsigned ) ; // размер блока в словах unsigned
 
@@ -396,11 +410,11 @@ void GammaCrypt::Matrix_Xor_Password( uint16_t * pmatrix_in , unsigned * pmatrix
     {
         for ( unsigned j = 0 ; j < block_size_words  ; j ++ )
         {
-            const unsigned matrix2_index = ( i * block_size_words + j ) * 2 ; // *2 because repos matrix is uint16_t
-            pmatrix_out[ i * block_size_words + j ] = mp_block_password[ j ] ^ 
+            const unsigned pmt2_index = ( i * block_size_words + j ) * 2 ; // *2 because permutation array is uint16_t
+            p_pma_out[ i * block_size_words + j ] = mp_block_password[ j ] ^ 
                 ( 
-                  ( unsigned( pmatrix_in[ matrix2_index + 1]) << 16 ) | 
-                  unsigned( pmatrix_in[ matrix2_index ] )
+                  ( unsigned( p_pma_in[ pmt2_index + 1]) << 16 ) | 
+                  unsigned( p_pma_in[ pmt2_index ] )
                 )  ;
         }
     }
@@ -437,9 +451,9 @@ void GammaCrypt::DisplayInfo()
     ostringstream oss ;
     oss << "\n source file size (bytes): " << m_header.source_file_size ;
     oss << "\n block size (bytes): " << m_block_size ;
-    oss << "\n matrix size (bytes): " << m_Reposition.m_BIarray.matrix_size_bytes ;
-    oss << "\n number of matrix elements: " << m_Reposition.m_BIarray.max_index ;
-    oss << "\n size of one matrix element (bits): " << m_Reposition.m_BIarray.index_size_bits ;
+    oss << "\n permutation array size (bytes): " << m_Permutate.m_BIarray.pma_size_bytes ;
+    oss << "\n number of permutation array elements: " << m_Permutate.m_BIarray.max_index ;
+    oss << "\n size of one permutation array element (bits): " << m_Permutate.m_BIarray.index_size_bits ;
     oss << "\n" ;
     display_str( oss.str() ) ;
 }
