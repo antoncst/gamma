@@ -20,7 +20,8 @@ public:
 
 private:    
     size_t m_block_size = 64 ;    // in bytes , further calculated in Initialize method, deponds on file size
-    bool mb_need_init_blocksize = true ; // for if block_size specified in command line
+    bool mb_need_init_blocksize = true ; // for if block_size specified in command line or for decrypt
+    bool mb_decrypting = false ;
 
     static const size_t m_quantum_size = sizeof ( unsigned) ; // block size of one calculating operation (probably 32 or 64 bit) 
                                             // размер блока одной вычислительной операции (наверняка 32 или 64 бита)
@@ -46,8 +47,22 @@ private:
     
     const std::string & m_password ;
     
+    // block random
+    // N = m_n_quantum / 4 
+    // offset in bytes:
+    //    KEY1           KEY2                PMA1                             PMA2                         tail KEY
+    // 0  ... N-1   N  ...  N*2-1   N*2...N*2+PMAsizeBytes-1   N*2+PMAsizeBytes...N*2+PMAsizeBytes*2-1    N*2+PMAsizeBytes*2 ... N*2+PMAsizeBytes*2+tailSize-1
     std::unique_ptr< t_block > mp_block_random ; // mp_...   m - member, p - pointer
     //obsolete: std::unique_ptr< t_block > mp_block_random3 ;
+    
+    //offsets bytes:
+    unsigned offs_key2 ;
+    unsigned offs_pma1 ;
+    unsigned offs_pma2 ;
+    unsigned offs_ktail ;
+    
+
+
     std::unique_ptr< t_block > mp_block_password ;
     std::unique_ptr< t_block > mp_block_source ;
     std::unique_ptr< t_block > mp_block_dest ;

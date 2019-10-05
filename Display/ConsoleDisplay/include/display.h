@@ -11,8 +11,18 @@
 #include <string>
 
 
+//----- GETCH -----
 
+#ifdef WINDOWS
+#include <conio.h>
+//#include <windows.h>
+#endif
+
+#ifdef LINUX
 int getch() ;
+#endif
+
+//----- END OF GETCH -----
 
 
 //----- EDIT_STRING -----

@@ -14,6 +14,12 @@
 #include "LFSR.h"
 #include "../../Display/ConsoleDisplay/include/display.h"
 
+#define PERMUTATE_ENBLD
+#define XOR_ENBLD
+#define LFSR_ENBLD
+
+//#define DBG_INFO_ENBLD
+
 using namespace std ;
 
 
@@ -62,11 +68,11 @@ void GammaCrypt::Initialize()
 */
     if ( mb_need_init_blocksize )
     {
-        if ( m_header.source_file_size >= 67108864 ) // 64M -
+        if ( m_header.source_file_size >= 67'108'864 ) // 64M -
             m_block_size = 128 ;
-        else if ( m_header.source_file_size >= 16777216 ) // 16M - 64M
+        else if ( m_header.source_file_size >= 16'777'216 ) // 16M - 64M
             m_block_size = 64 ;
-        else if ( m_header.source_file_size >= 1048576 ) // 1M - 16M
+        else if ( m_header.source_file_size >= 1'048'576 ) // 1M - 16M
             m_block_size = 32 ;
         else if ( m_header.source_file_size >= 4096 ) // 4K - 1M
             m_block_size = 16 ;
@@ -99,7 +105,15 @@ void GammaCrypt::Initialize()
     // offset in bytes:
     //    KEY1           KEY2                PMA1                             PMA2                         tail KEY
     // 0  ... N-1   N  ...  N*2-1   N*2...N*2+PMAsizeBytes-1   N*2+PMAsizeBytes...N*2+PMAsizeBytes*2-1    N*2+PMAsizeBytes*2 ... N*2+PMAsizeBytes*2+tailSize-1
-    mp_block_random    = make_unique< t_block >( m_n_quantum * 3 + m_Permutate.m_BIarray.pma_size_bytes ) ; 
+    mp_block_random    = make_unique< t_block >( m_n_quantum * 3 + m_Permutate.m_BIarray.pma_size_bytes * 2 / m_quantum_size ) ; 
+
+    // m_Permutate Initializing
+    m_Permutate.Init( m_block_size , reinterpret_cast< unsigned char * >( mp_block_random.get() ) ) ;
+
+    offs_key2 = m_block_size ;
+    offs_pma1 = m_block_size * 2 ;
+    offs_pma2 = m_block_size * 2 + m_Permutate.m_BIarray.pma_size_bytes ;
+    offs_ktail = m_block_size * 2 + m_Permutate.m_BIarray.pma_size_bytes * 2 ;
 
 
     // password block initialization
@@ -144,7 +158,7 @@ void GammaCrypt::Encrypt()
             // time mesaure
             auto mcs1 = std::chrono::high_resolution_clock::now() ;
             //
-    GenerateRandoms( m_n_quantum * 2 + tail_size_words , mp_block_random.get() ) ;
+    GenerateRandoms( m_n_quantum * 2 + m_Permutate.m_BIarray.pma_size_bytes * 2 / m_quantum_size + tail_size_words , mp_block_random.get() ) ;
             // time mesaure
             auto mcs2 = std::chrono::high_resolution_clock::now() ;
             std::chrono::duration<double> mcs = mcs2 - mcs1 ;
@@ -152,24 +166,38 @@ void GammaCrypt::Encrypt()
             std::cout << "Duration: " << drtn << std::endl ;
             //
     
-    display_str("making permutation array...") ;
+    //display_str("making permutation array...") ;
             // time mesaure
-            mcs1 = std::chrono::high_resolution_clock::now() ;
+            //mcs1 = std::chrono::high_resolution_clock::now() ;
             //
-    m_Permutate.Init( m_block_size ) ;
-    m_Permutate.MakePermutArr() ;
+
+    // m_Permutate initializing is inside GammaCrypt::Initialize
+    if ( ! mb_decrypting )
+    {
+        m_Permutate.MakePermutArr( m_Permutate.e_array.get() , m_Permutate.mpc_randoms + m_block_size * 2 , m_Permutate.m_BIarray ) ;
+        m_Permutate.MakePermutArr( m_Permutate.e_array2.get() , m_Permutate.mpc_randoms + m_block_size * 2 + m_Permutate.m_BIarray.pma_size_bytes , m_Permutate.m_BIarray2 ) ;
+    }
+    
+
+        #ifdef DBG_INFO_ENBLD
         // cout pma
-        /*std::cout << "\n" ;
-        for ( int i = 0 ; i < m_Permutate.max_index ; i ++)
-            std::cout << m_Permutate[ i ] << ' ' ;
-        std::cout << std::endl ;*/
+        std::cout << "\n pma1 \n " ;
+        for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
+            std::cout << m_Permutate.e_array[ i ] << ' ' ;
+        std::cout << std::endl ;
+
+        std::cout << "\n pma2 \n " ;
+        for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
+            std::cout << m_Permutate.e_array2[ i ] << ' ' ;
+        std::cout << std::endl ;
+        #endif // DBG_INFO_ENBLD
 
             // time mesaure
-            mcs2 = std::chrono::high_resolution_clock::now() ;
+/*            mcs2 = std::chrono::high_resolution_clock::now() ;
             mcs = mcs2 - mcs1 ;
             drtn = mcs.count() * 1000000 ;
             std::cout << "Duration: " << drtn << std::endl ;
-            //
+*/            //
 
     WriteHead() ; 
     DisplayInfo() ;
@@ -181,12 +209,13 @@ void GammaCrypt::Encrypt()
 
     display_str("crypting...") ;
 
-            // time mesaure
-            mcs1 = std::chrono::high_resolution_clock::now() ;
-            //
+        // time mesaure
+        mcs1 = std::chrono::high_resolution_clock::now() ;
+        //
 
-    auto temp_block = std::make_unique< unsigned char[] >( m_Permutate.m_BIarray.block_size_bytes ) ; // for PMA
-    auto e_temp_block = std::make_unique< uint16_t[] >( m_Permutate.m_BIarray.max_index ) ;
+    //auto temp_block = std::make_unique< unsigned char[] >( m_Permutate.m_BIarray.block_size_bytes ) ; // for PMA
+    auto e_temp_block = std::make_unique< unsigned char[] >( m_block_size ) ; // for ePMA
+    auto e_temp_block_pma = std::make_unique< uint16_t[] >( m_Permutate.epma_size_elms ) ; // for ePMA2
 
     uint16_t bytes_read ;
 
@@ -200,25 +229,61 @@ void GammaCrypt::Encrypt()
         {
             assert( bytes_read == tail_size_bytes ) ;
             // тогда остаток блока надо добить randoms[m_n_quantum*2] .. randoms[m_n_quantum*2 + tail_size_bytes]
-            memset( (char*) mp_block_source.get() + bytes_read, 0 , m_block_size - bytes_read ) ;
+            memcpy( (char*) mp_block_source.get() + bytes_read, /*reinterpret_cast< unsigned char * >*/ (unsigned char *) ( mp_block_random.get() ) + offs_ktail , m_block_size - bytes_read ) ;
         }
         
 
+        // ----------- XOR1 -----------
+
+        #ifdef XOR_ENBLD
         
-        // XOR1
+        #ifdef LFSR_ENBLD
         ( *mpShift )( mp_block_random.get() ) ;
+        #endif // LFSR_ENBLD
+        
         for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
             mp_block_dest[i] = mp_block_source[i] ^ mp_block_random[i] ;
+            
+        #else
         
-        //REPOSITIONING
-        m_Permutate.eRearrange( (unsigned char*) mp_block_dest.get() , temp_block.get() ) ;
-        
-        // XOR3
-        ( *mpShift )( mp_block_random.get() + m_n_quantum ) ;
         for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
-            mp_block_dest[i] = mp_block_dest[i] ^ mp_block_random[i + m_n_quantum] ;
+            mp_block_dest[i] = mp_block_source[i] ;
+            
+        #endif  // XOR_ENBLD
+
+        // ---------- REPOSITIONING ----------
+
+        #ifdef PERMUTATE_ENBLD
         
-        //OUT
+        m_Permutate.eRearrangePMA1( e_temp_block_pma.get() , m_Permutate.e_array2.get() ) ;
+
+            #ifdef DBG_INFO_ENBLD
+            // cout pma
+            std::cout << "\n rearranged pma1 \n " ;
+            for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
+                std::cout << m_Permutate.e_array[ i ] << ' ' ;
+            std::cout << std::endl ;
+            #endif // DBG_INFO_ENBLD
+
+        m_Permutate.eRearrange( (unsigned char*) mp_block_dest.get() , e_temp_block.get() , m_Permutate.e_array.get() ) ;
+
+        #endif // PERMUTATE_ENBLD
+        
+        // ----------- XOR2 ------------
+
+        #ifdef XOR_ENBLD
+
+        #ifdef LFSR_ENBLD
+        ( *mpShift )( mp_block_random.get() + offs_key2 / m_quantum_size ) ;
+        #endif // LFSR_ENBLD
+
+        for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
+            mp_block_dest[i] = mp_block_dest[i] ^ mp_block_random[i + offs_key2 / m_quantum_size ] ;
+        
+        #endif // XOR_ENBLD
+
+        // ------------ OUT ------------
+
         m_ofs.write( (char*) mp_block_dest.get() , m_block_size /*bytes_read*/ ) ;
 
 /*        // for debugging
@@ -240,12 +305,12 @@ void GammaCrypt::Encrypt()
 
     }
     
-            // time mesaure
-            mcs2 = std::chrono::high_resolution_clock::now() ;
-            mcs = mcs2 - mcs1 ;
-            drtn = mcs.count() * 1000000 ;
-            std::cout << "Duration: " << drtn << std::endl ;
-            //
+        // time mesaure
+        mcs2 = std::chrono::high_resolution_clock::now() ;
+        mcs = mcs2 - mcs1 ;
+        drtn = mcs.count() * 1'000'000 ;
+        std::cout << "Duration: " << drtn << std::endl ;
+        //
     
 }
 
@@ -254,12 +319,26 @@ void GammaCrypt::Decrypt()
     ReadHead() ;
     
     m_block_size = m_header.h_block_size ;
+    mb_decrypting = true ;
     mb_need_init_blocksize = false ;
     
     Initialize() ;
-    m_Permutate.Init( m_block_size ) ;
+    //m_Permutate.Init( m_block_size , ) ;
     ReadOverheadData() ;
     
+        #ifdef DBG_INFO_ENBLD
+        // cout pma
+        std::cout << "\n pma1 \n" ;
+        for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
+            std::cout << m_Permutate.e_array[ i ] << ' ' ;
+        std::cout << std::endl ;
+
+        std::cout << "\n pma2 \n" ;
+        for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
+            std::cout << m_Permutate.e_array2[ i ] << ' ' ;
+        std::cout << std::endl ;
+        #endif // DBG_INFO_ENBLD
+
     DisplayInfo() ;
     
     // CRYPT  Crypt() ;
@@ -267,7 +346,16 @@ void GammaCrypt::Decrypt()
         assert( mp_block_source != nullptr ) ;
         assert( mp_block_dest != nullptr ) ;
 
-    auto temp_block = std::make_unique< unsigned char[] >( m_Permutate.m_BIarray.block_size_bytes ) ; // for PMA
+    auto temp_block = std::make_unique< unsigned char[] >( m_block_size ) ; // for PMA
+    //auto e_temp_block = std::make_unique< unsigned char[] >( m_block_size ) ; // for ePMA
+    auto e_temp_block_pma = std::make_unique< uint16_t[] >( m_Permutate.epma_size_elms ) ; // for ePMA2
+    
+    auto t_invs_pma2 = std::make_unique< uint16_t[] >( m_Permutate.epma_size_elms ) ;
+    auto t_invs_pma1 = std::make_unique< uint16_t[] >( m_Permutate.epma_size_elms ) ;
+
+            // time mesaure
+            auto mcs1 = std::chrono::high_resolution_clock::now() ;
+            //
 
     int64_t i = m_header.source_file_size ;
     while ( i > 0 )
@@ -278,18 +366,61 @@ void GammaCrypt::Decrypt()
         if ( bytes_read == 0 )
             break ;
         
-        // XOR3
+        #ifdef XOR_ENBLD
+        // XOR2
         ( *mpShift )( mp_block_random.get() + m_n_quantum ) ;
         for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
-            mp_block_source[i] = mp_block_source[i] ^ mp_block_random[ i + m_n_quantum ] ;
+            mp_block_source[i] = mp_block_source[i] ^ mp_block_random[ i + offs_key2 / m_quantum_size ] ;
         
+        #endif // XOR_ENBLD
+
+        #ifdef PERMUTATE_ENBLD
         //REPOSITIONING
         
-        m_Permutate.eRearrange( ( unsigned char*) mp_block_source.get() , temp_block.get() ) ;
+        //inverse pma2
+/*        m_Permutate.InverseExpPermutArr( t_invs_pma2.get() , m_Permutate.e_array2.get() ) ;
+            #ifdef DBG_INFO_ENBLD
+            // cout pma
+            std::cout << "\n invrs pma2 \n" ;
+            for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
+                std::cout << t_invs_pma2[ i ] << ' ' ;
+            std::cout << std::endl ;
+            #endif // DBG_INFO_ENBLD
+*/
+        //rearrange pma1
+        m_Permutate.eRearrangePMA1( e_temp_block_pma.get() , m_Permutate.e_array2.get() ) ;
+            #ifdef DBG_INFO_ENBLD
+            // cout pma
+            std::cout << "\n rearranged pma1 \n" ;
+            for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
+                std::cout << m_Permutate.e_array[ i ] << ' ' ;
+            std::cout << std::endl ;
+            #endif // DBG_INFO_ENBLD
+
+        //inverse pma1
+        m_Permutate.InverseExpPermutArr( t_invs_pma1.get() , m_Permutate.e_array.get() ) ;
+            #ifdef DBG_INFO_ENBLD
+            // cout pma
+            std::cout << "\n invrs pma1 \n" ;
+            for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
+                std::cout << t_invs_pma1[ i ] << ' ' ;
+            std::cout << std::endl ;
+            #endif // DBG_INFO_ENBLD
+        
+        m_Permutate.eRearrange( ( unsigned char*) mp_block_source.get() , temp_block.get() , t_invs_pma1.get() ) ;
+
+        #endif // PERMUTATE_ENBLD
+        
+        #ifdef XOR_ENBLD
         // XOR1
         ( *mpShift )( mp_block_random.get() ) ;
         for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
             mp_block_dest[i] = mp_block_source[i] ^ mp_block_random[i] ;
+            
+        #else
+        for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
+            mp_block_dest[i] = mp_block_source[i] ;
+        #endif // XOR_ENBLD
         
         //it should not be the tail now
         // checking tail size
@@ -311,6 +442,12 @@ void GammaCrypt::Decrypt()
         m_ofs.write( (char*) mp_block_dest.get() , bytes_to_write ) ;
 
     }
+            // time mesaure
+            auto mcs2 = std::chrono::high_resolution_clock::now() ;
+            std::chrono::duration<double> mcs = mcs2 - mcs1 ;
+            uint64_t drtn = mcs.count() * 1000000 ;
+            std::cout << "Duration: " << drtn << std::endl ;
+            //
 }
 
 void GammaCrypt::ReadHead()
@@ -335,15 +472,15 @@ void GammaCrypt::ReadOverheadData()
     for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
         mp_block_random[i] = block_key[i] ^ mp_block_password[i] ;
 
-    //Key3
+    //Key2
     m_ifs.read( (char*) block_key.get() , m_block_size ) ;
     if ( (unsigned) m_ifs.gcount() <  m_block_size )
-        throw ("error: File too short, missing key block") ;
+        throw ("error: File too short, missing key2 block") ;
 
     for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
-        mp_block_random[ i + m_n_quantum ] = block_key[i] ^ mp_block_password[i] ;
+        mp_block_random[ i + offs_key2 / m_quantum_size ] = block_key[i] ^ mp_block_password[i] ;
 
-    // Permutation Array
+    // Permutation Array 1
     m_ifs.read( (char*) m_Permutate.m_BIarray.m_array.get() , m_Permutate.m_BIarray.pma_size_bytes ) ;
     if ( (unsigned) m_ifs.gcount() <  m_Permutate.m_BIarray.pma_size_bytes )
         throw ("error: File too short, missing permutation array block") ;
@@ -356,12 +493,34 @@ void GammaCrypt::ReadOverheadData()
     PMA_Xor_Password( (uint16_t *) m_Permutate.m_BIarray.m_array.get() , block_pma_xored.get() ) ;
     memcpy( m_Permutate.m_BIarray.m_array.get() , block_pma_xored.get() , m_Permutate.m_BIarray.pma_size_bytes ) ;
 
-    m_Permutate.InversePermutArr() ;
+    //m_Permutate.InversePermutArr( m_Permutate.m_BIarray ) ;
     
     // build e_array, aka Expanded in the memory
     for ( uint16_t i = 0 ; i < m_Permutate.m_BIarray.max_index ; ++i )
     {
         m_Permutate.e_array.get()[ i ] = m_Permutate.m_BIarray[ i ] ;
+    }
+
+
+    // Permutation Array 2
+    m_ifs.read( (char*) m_Permutate.m_BIarray2.m_array.get() , m_Permutate.m_BIarray2.pma_size_bytes ) ;
+    if ( (unsigned) m_ifs.gcount() <  m_Permutate.m_BIarray2.pma_size_bytes )
+        throw ("error: File too short, missing permutation array block") ;
+        
+    block_pma_size_words = m_Permutate.m_BIarray2.pma_size_bytes / sizeof(unsigned) ;
+    if ( m_Permutate.m_BIarray2.pma_size_bytes % sizeof( unsigned ) != 0  )
+        block_pma_size_words++ ;
+
+    //auto block_pma_xored = make_unique< unsigned[] >( block_pma_size_words ) ;
+    PMA_Xor_Password( (uint16_t *) m_Permutate.m_BIarray2.m_array.get() , block_pma_xored.get() ) ;
+    memcpy( m_Permutate.m_BIarray2.m_array.get() , block_pma_xored.get() , m_Permutate.m_BIarray2.pma_size_bytes ) ;
+
+    //m_Permutate.InversePermutArr( m_Permutate.m_BIarray2 ) ;
+    
+    // build e_array, aka Expanded in the memory
+    for ( uint16_t i = 0 ; i < m_Permutate.m_BIarray2.max_index ; ++i )
+    {
+        m_Permutate.e_array2.get()[ i ] = m_Permutate.m_BIarray2[ i ] ; // todo get out get()
     }
 
 } ;
@@ -382,20 +541,31 @@ void GammaCrypt::WriteHead()
     for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
         block_key[i] = mp_block_random[i] ^ mp_block_password[i] ;
     m_ofs.write( (char*) block_key.get() , m_block_size ) ;
-    //Key3
+    //Key2
     for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
-        block_key[i] = mp_block_random[ i + m_n_quantum ] ^ mp_block_password[i] ;
+        block_key[i] = mp_block_random[ i + offs_key2 / m_quantum_size ] ^ mp_block_password[i] ;
     m_ofs.write( (char*) block_key.get() , m_block_size ) ;
+
     
-    //Permutation array
+    //Permutation array 1
     // 1) XOR with password_block
-    unsigned block_pma_size_words = m_Permutate.m_BIarray.pma_size_bytes / sizeof(unsigned) ;
-    if ( m_Permutate.m_BIarray.pma_size_bytes % sizeof( unsigned ) != 0  )
+    unsigned block_pma_size_words = m_Permutate.m_BIarray.pma_size_bytes / m_quantum_size ;
+    if ( m_Permutate.m_BIarray.pma_size_bytes % m_quantum_size != 0 )
         block_pma_size_words++ ;
     auto block_pma_xored = make_unique< unsigned[] >( block_pma_size_words ) ;
     PMA_Xor_Password( ( uint16_t * ) m_Permutate.m_BIarray.m_array.get() , block_pma_xored.get() ) ;
     // 2) write to file
-    m_ofs.write( (char*) block_pma_xored.get() , block_pma_size_words * sizeof(unsigned) ) ;
+    m_ofs.write( (char*) block_pma_xored.get() , block_pma_size_words * m_quantum_size ) ;
+    
+    //Permutation array 2
+    // 1) XOR with password_block
+    block_pma_size_words = m_Permutate.m_BIarray2.pma_size_bytes / m_quantum_size ;
+    if ( m_Permutate.m_BIarray2.pma_size_bytes % m_quantum_size != 0 )
+        block_pma_size_words++ ;
+    //auto block_pma_xored = make_unique< unsigned[] >( block_pma_size_words ) ;
+    PMA_Xor_Password( ( uint16_t * ) m_Permutate.m_BIarray2.m_array.get() , block_pma_xored.get() ) ;
+    // 2) write to file
+    m_ofs.write( (char*) block_pma_xored.get() , block_pma_size_words * m_quantum_size ) ;
 }
 
 void GammaCrypt::PMA_Xor_Password( uint16_t * p_pma_in , unsigned * p_pma_out )
@@ -404,7 +574,7 @@ void GammaCrypt::PMA_Xor_Password( uint16_t * p_pma_in , unsigned * p_pma_out )
     unsigned N_blocks = m_Permutate.m_BIarray.pma_size_bytes / m_block_size ;
     if ( m_Permutate.m_BIarray.pma_size_bytes % m_block_size != 0  )
         N_blocks++ ;
-    const unsigned block_size_words = m_block_size / sizeof( unsigned ) ; // размер блока в словах unsigned
+    const unsigned block_size_words = m_block_size / m_quantum_size ; // размер блока в словах unsigned
 
     for ( unsigned i = 0 ; i < N_blocks ; ++i )
     {

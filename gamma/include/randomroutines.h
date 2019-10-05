@@ -65,16 +65,25 @@ public:
 class Permutate
 {
 public:
+
+    unsigned char *  mpc_randoms ; // mpc - Member, Pointer to unsigned Char
+
+    unsigned epma_size_elms ;
     // массив перестановок (развернутый: )
     std::unique_ptr< uint16_t[] > e_array ; // expanded array
+    std::unique_ptr< uint16_t[] > e_array2 ; // expanded array2
 
     BitsetItmesArray m_BIarray ;
+    BitsetItmesArray m_BIarray2 ;
 
-    void Init( size_t block_size ) ;
+    void Init( size_t block_size , unsigned char * pc_randoms ) ;
     // Make Permutation Array
-    void MakePermutArr() ;
-    void InversePermutArr() ;
+    void MakePermutArr( uint16_t * earr , unsigned char * pc_randoms , BitsetItmesArray & bi_arr ) ;
+    void InversePermutArr( BitsetItmesArray & bi_arr ) ;
+    void InverseExpPermutArr( uint16_t * p_earr, uint16_t * p_pm_earr ) noexcept ; // p_pm_earr  -Pointer to _ PurMutation _ Expanded ARRay
     void Rearrange( unsigned char * p_block , uint16_t bytes_read , unsigned char * temp_block ) noexcept ;
-    void eRearrange( unsigned char * p_block , unsigned char * temp_block ) noexcept ;
+    void eRearrange( unsigned char * p_block , unsigned char * temp_block , uint16_t * p_pm_earr ) noexcept ;
 
+    // rearrange PMA1 via PMA2
+    void eRearrangePMA1( uint16_t * temp_block , uint16_t * p_pm_earr ) noexcept ;
 } ;

@@ -127,7 +127,7 @@ void GenRandByHdd( unsigned const N , t_block rvals )
         std::chrono::duration<double> mcs = mcs2 - mcs1 ;
         mcs1 = mcs2 ;
         /*uint64_t*/ unsigned rval ; //random value
-        rval = mcs.count() * 1000000000 ;
+        rval = mcs.count() * 1'000'000'000 ;
         
         rvals[ i*2 ] = rval ;
 
@@ -142,7 +142,7 @@ void GenRandByHdd( unsigned const N , t_block rvals )
             mcs2 = std::chrono::high_resolution_clock::now() ;
             mcs = mcs2 - mcs1 ;
             mcs1 = mcs2 ;
-            rval = mcs.count() * 1000000000 ;
+            rval = mcs.count() * 1'000'000'000 ;
             
             rvals[ i*2 +1 ] = rval ;
         }
@@ -156,7 +156,7 @@ int DetermineHighSetBit( unsigned const val )
     if ( val > 0 )
     {
                                       // 31                             8 7  4    0
-        unsigned umask = 0x80000000 ; //  1000 0000 0000 0000   0000 0000 0000 0000
+        unsigned umask = 0x8000'0000 ; //  1000 0000 0000 0000   0000 0000 0000 0000
         int n = 31 ;
         for ( n = 31 ; n >= 0 ; n-- , umask >>= 1 )
             if ( (val & umask) > 0 )
@@ -227,7 +227,7 @@ unsigned CompoundContiguousRandoms( unsigned const rsize , t_block block , unsig
         rsize_bits-- ; // т.к. сбросили старшую единицу
         rval = rval << current_bit_offset ; //сдвигаю влево, может логичнее было бы двигать вправо, но т.к. у нас ГСЧ, то значения никакого не имеет
         
-        block[ current_block_index ] |= unsigned ( rval & 0xFFFFFFFF );
+        block[ current_block_index ] |= unsigned ( rval & 0xFFFF'FFFF );
         if ( current_bit_offset + rsize_bits > 31 ) // got out of 32 bits / вылез за 32 бита
         {
             if ( current_block_index + 1 >= rsize )
@@ -307,42 +307,61 @@ void TransformRandomCycle( unsigned * block_random , const size_t n_quantum )
 
 //------------- REPOSITIONING --------------------
 
-void Permutate::Init( size_t block_size )
+void Permutate::Init( size_t block_size , unsigned char * pc_randoms )
 {
+    mpc_randoms = pc_randoms ;
+    //Extended (in memory) Permutation Array size, elements
+    epma_size_elms = block_size * 8 ; // block size bytes * 8 bits
     m_BIarray.Init( block_size ) ;
+    m_BIarray2.Init( block_size ) ;
     e_array = std::make_unique< uint16_t[] >( m_BIarray.max_index) ;
+    e_array2 = std::make_unique< uint16_t[] >( m_BIarray2.max_index) ;
+    
 } 
 
-void Permutate::InversePermutArr()
+void Permutate::InversePermutArr( BitsetItmesArray & bi_arr )
 {
     //std::vector< uint16_t > inverse_pma ;
     BitsetItmesArray inverse_pma ;
-    inverse_pma.Init( m_BIarray.block_size_bytes  ) ;
+    inverse_pma.Init( bi_arr.block_size_bytes  ) ;
     
     //inverse_pma.reserve( max_index ) ;
-    for ( unsigned i = 0 ; i < m_BIarray.max_index ;  ++i )
+    for ( unsigned i = 0 ; i < bi_arr.max_index ;  ++i )
     {
-        inverse_pma.set( m_BIarray[ i ] , i ) ;
+        inverse_pma.set( bi_arr[ i ] , i ) ;
     }
-    memcpy( m_BIarray.m_array.get() , inverse_pma.m_array.get() , m_BIarray.pma_size_bytes ) ; // todo move
+    memcpy( bi_arr.m_array.get() , inverse_pma.m_array.get() , bi_arr.pma_size_bytes ) ; // todo move
 } 
 
-void Permutate::MakePermutArr()
+void Permutate::InverseExpPermutArr( uint16_t * p_earr , uint16_t * p_pm_earr ) noexcept
+{
+    //auto inverse_earr  = std::make_unique< uint16_t[] >( epma_size_elms );
+    
+    //inverse_pma.reserve( max_index ) ;
+    for ( unsigned i = 0 ; i < epma_size_elms ;  ++i )
+    {
+        p_earr[ p_pm_earr[ i ] ] = i ;
+    }
+    //memcpy( p_earr , inverse_earr.get() , epma_size_elms * sizeof( uint16_t ) ) ; // todo move
+} 
+
+void Permutate::MakePermutArr( uint16_t * earr , unsigned char * pc_randoms , BitsetItmesArray & bi_arr )
 {
     //сгенерируем  список индексов
     std::vector< uint16_t > indexes_container ;
-    indexes_container.reserve( m_BIarray.max_index ) ;
-    for ( uint16_t i = 0 ; i < m_BIarray.max_index ; ++i )
+    indexes_container.reserve( bi_arr.max_index ) ;
+    for ( uint16_t i = 0 ; i < bi_arr.max_index ; ++i )
         indexes_container.push_back( i ) ;
 
     BitsetItmesArray BI_rands ;
-    BI_rands.Init( /*N_bytes*/ m_BIarray.block_size_bytes ) ;
+    BI_rands.Init( /*N_bytes*/ bi_arr.block_size_bytes ) ;
 
-    assert( m_BIarray.pma_size_bytes % 4 == 0 ) ;
-    GenerateRandoms( m_BIarray.pma_size_bytes / 4 , ( unsigned * ) BI_rands.m_array.get() ) ;
+    assert( bi_arr.pma_size_bytes % 4 == 0 ) ;
+    //GenerateRandoms( bi_arr.pma_size_bytes / 4 , ( unsigned * ) BI_rands.m_array.get() ) ;
+    memcpy( BI_rands.m_array.get() , pc_randoms , bi_arr.pma_size_bytes ) ;
     
     //display_str("making pma...") ;
-    for ( unsigned i = 0 ; i < m_BIarray.max_index ; ++i )
+    for ( unsigned i = 0 ; i < bi_arr.max_index ; ++i )
     {
         // вместо rands - unique_ptr< t_block > 
         // нужен BitsetItmesArray
@@ -354,11 +373,11 @@ void Permutate::MakePermutArr()
             r = rands[ i/2 ] >> 16 ; */
         // m_array[ i ] =  indexes_deque[ rr ] ; // 
         
-        uint16_t rr = ( r % ( m_BIarray.max_index - i ) ) ;
+        uint16_t rr = ( r % ( bi_arr.max_index - i ) ) ;
         //repostn_pma[ i ] = indexes[ rr ] ;
         
-        m_BIarray.set( i ,  indexes_container[ rr ] ) ;
-        e_array.get() [ i ] = indexes_container[ rr ] ;
+        bi_arr.set( i ,  indexes_container[ rr ] ) ;
+        earr[ i ] = indexes_container[ rr ] ;
         indexes_container.erase( indexes_container.begin() + rr ) ;
     }
 } ;
@@ -392,17 +411,27 @@ void Permutate::Rearrange( unsigned char * p_block , uint16_t bytes_read , unsig
     
 }
 
-void Permutate::eRearrange( unsigned char * p_block , unsigned char * temp_block ) noexcept
+void Permutate::eRearrangePMA1( uint16_t * temp_block , uint16_t * p_pm_earr ) noexcept
+{
+    for ( unsigned i = 0 ; i < epma_size_elms ; ++i )
+    {
+        temp_block[ p_pm_earr[ i ] ] = e_array[ i ] ;
+    }
+    memcpy( e_array.get() , temp_block , epma_size_elms * sizeof( uint16_t ) ) ;
+}
+
+
+void Permutate::eRearrange( unsigned char * p_block , unsigned char * temp_block , uint16_t * p_pm_earr ) noexcept
 {
 
     memset( temp_block , 0 , m_BIarray.block_size_bytes ) ; // todo out away , нельзя убирать, т к биты задаются операцией |=, т е исходный бит д.б. сброшен
 
     //BitArray res_BA( temp_block ) ;
 
-    for ( uint16_t i = 0 ; i < m_BIarray.max_index ; ++i )
+    for ( uint16_t i = 0 ; i < epma_size_elms ; ++i )
     {
-        uint16_t byte_offset_src = e_array.get()[ i ] / 8 ;
-        uint16_t bit_offset_src = e_array.get()[ i ] % 8 ;
+        uint16_t byte_offset_src = p_pm_earr[ i ] / 8 ;
+        uint16_t bit_offset_src = p_pm_earr[ i ] % 8 ;
         
         uint16_t byte_offset_res = i / 8 ;
         uint16_t bit_offset_res = i % 8 ;

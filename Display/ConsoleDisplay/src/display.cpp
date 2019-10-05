@@ -4,17 +4,7 @@
 //#include " display.h"
 #include "../Display/ConsoleDisplay/include/display.h"
 
-#include <string>
-#include <iostream>
-#include <cassert>
-
-
 //----- GETCH -----
-
-#ifdef WINDOWS
-#include <conio.h>
-//#include <windows.h>
-#endif
 
 #ifdef LINUX
 #include <iostream>
@@ -36,6 +26,12 @@ int getch()
 #endif
 
 //----- END OF GETCH -----
+
+
+
+#include <string>
+#include <iostream>
+#include <cassert>
 
 
 //----- EDIT_STRING -----
