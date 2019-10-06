@@ -261,14 +261,14 @@ void GammaCrypt::Encrypt()
         m_Permutate.eTransformPMA2() ;
         m_Permutate.eRearrangePMA1( e_temp_block_pma.get() , m_Permutate.e_array2.get() ) ;
 
-            #ifdef DBG_INFO_ENBLD
+/*            #ifdef DBG_INFO_ENBLD
             // cout pma
             std::cout << "\n rearranged pma1 \n " ;
             for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
                 std::cout << m_Permutate.e_array[ i ] << ' ' ;
             std::cout << std::endl ;
             #endif // DBG_INFO_ENBLD
-
+*/
         m_Permutate.eRearrange( (unsigned char*) mp_block_dest.get() , e_temp_block.get() , m_Permutate.e_array.get() ) ;
 
         #endif // PERMUTATE_ENBLD
@@ -389,24 +389,24 @@ void GammaCrypt::Decrypt()
 
         //rearrange pma1
         m_Permutate.eRearrangePMA1( e_temp_block_pma.get() , m_Permutate.e_array2.get() ) ;
-            #ifdef DBG_INFO_ENBLD
+/*            #ifdef DBG_INFO_ENBLD
             // cout pma
             std::cout << "\n rearranged pma1 \n" ;
             for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
                 std::cout << m_Permutate.e_array[ i ] << ' ' ;
             std::cout << std::endl ;
             #endif // DBG_INFO_ENBLD
-
+*/
         //inverse pma1
         m_Permutate.InverseExpPermutArr( t_invs_pma1.get() , m_Permutate.e_array.get() ) ;
-            #ifdef DBG_INFO_ENBLD
+/*            #ifdef DBG_INFO_ENBLD
             // cout pma
             std::cout << "\n invrs pma1 \n" ;
             for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
                 std::cout << t_invs_pma1[ i ] << ' ' ;
             std::cout << std::endl ;
             #endif // DBG_INFO_ENBLD
-        
+*/
         m_Permutate.eRearrange( ( unsigned char*) mp_block_source.get() , temp_block.get() , t_invs_pma1.get() ) ;
 
         #endif // PERMUTATE_ENBLD

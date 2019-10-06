@@ -119,7 +119,7 @@ void GenRandByHdd( unsigned const N , t_block rvals )
         std::ofstream ofs ;
         ofs.open( "temp_1", std::ios::out | std::ios::trunc) ;
         ofs << "ttt" ;
-        std::this_thread::sleep_for( std::chrono::microseconds( 20 ) ) ;
+        std::this_thread::sleep_for( std::chrono::microseconds( 200 ) ) ;
         ofs.flush() ;
         ofs.close() ;
         
@@ -135,7 +135,7 @@ void GenRandByHdd( unsigned const N , t_block rvals )
             std::ofstream ofs2 ;
             ofs2.open( "temp_2", std::ios::out | std::ios::trunc) ;
             ofs2 << "ttt" ;
-            std::this_thread::sleep_for( std::chrono::microseconds( 20 ) ) ;
+            std::this_thread::sleep_for( std::chrono::microseconds( 200 ) ) ;
             ofs2.flush() ;
             ofs2.close() ;
 
@@ -265,6 +265,18 @@ void GenerateRandoms( unsigned const rsize , t_block randoms )
     {
         auto rvals = std::make_unique< t_block >( N ) ;
         GenRandByHdd( N , rvals.get() ) ;
+
+        std::cout << " Randoms by HDD : \n" ;
+        for ( unsigned i = 0 ; i < N ; ++ i )
+        {
+            std::cout << rvals[ i ] << ' ' ;
+        }
+        std::cout << std::endl << " Randoms by HDD in hex : \n" ;
+        for ( unsigned i = 0 ; i < N ; ++ i )
+        {
+            std::cout << std::hex << rvals[ i ] << ' ' ;
+        }
+        
         CropRandoms( N ,rvals.get() ) ;
         unsigned received_rsize = CompoundContiguousRandoms( rsize , randoms , N , rvals.get() ) ;
         if ( received_rsize == rsize ) 
