@@ -68,15 +68,15 @@ void GammaCrypt::Initialize()
 */
     if ( mb_need_init_blocksize )
     {
-        if ( m_header.source_file_size >= 67'108'864 ) // 64M -
+        if ( m_header.source_file_size >= 131072 )     // 128K -
             m_block_size = 128 ;
-        else if ( m_header.source_file_size >= 16'777'216 ) // 16M - 64M
+        else if ( m_header.source_file_size >= 65536 ) // 64K - 128K
             m_block_size = 64 ;
-        else if ( m_header.source_file_size >= 1'048'576 ) // 1M - 16M
+        else if ( m_header.source_file_size >= 16384 ) // 16K - 64K
             m_block_size = 32 ;
-        else if ( m_header.source_file_size >= 4096 ) // 4K - 1M
+        else if ( m_header.source_file_size >= 2048 )  // 2K - 16K
             m_block_size = 16 ;
-        else        // 0 - 4K
+        else                                           // 0 - 2K
             m_block_size = 8 ;        
     }
 
@@ -94,6 +94,9 @@ void GammaCrypt::Initialize()
     
     m_n_quantum = m_block_size / m_quantum_size ;
     
+    // m_Permutate Initializing
+    m_Permutate.Init( m_block_size ) ;
+
     // allocate memory
     mp_block_password  = make_unique< t_block >( m_n_quantum ) ;
     // obsolete: mp_block_random3   = make_unique< t_block >( m_n_quantum + 1 ) ; // obsolete: to transform Random block it is required one quantum more (therefore "+1")
@@ -108,7 +111,7 @@ void GammaCrypt::Initialize()
     mp_block_random    = make_unique< t_block >( m_n_quantum * 3 + m_Permutate.m_BIarray.pma_size_bytes * 2 / m_quantum_size ) ; 
 
     // m_Permutate Initializing
-    m_Permutate.Init( m_block_size , reinterpret_cast< unsigned char * >( mp_block_random.get() ) ) ;
+    m_Permutate.mpc_randoms = reinterpret_cast< unsigned char * >( mp_block_random.get() ) ;
 
     offs_key2 = m_block_size ;
     offs_pma1 = m_block_size * 2 ;
@@ -255,6 +258,7 @@ void GammaCrypt::Encrypt()
 
         #ifdef PERMUTATE_ENBLD
         
+        m_Permutate.eTransformPMA2() ;
         m_Permutate.eRearrangePMA1( e_temp_block_pma.get() , m_Permutate.e_array2.get() ) ;
 
             #ifdef DBG_INFO_ENBLD
@@ -350,7 +354,6 @@ void GammaCrypt::Decrypt()
     //auto e_temp_block = std::make_unique< unsigned char[] >( m_block_size ) ; // for ePMA
     auto e_temp_block_pma = std::make_unique< uint16_t[] >( m_Permutate.epma_size_elms ) ; // for ePMA2
     
-    auto t_invs_pma2 = std::make_unique< uint16_t[] >( m_Permutate.epma_size_elms ) ;
     auto t_invs_pma1 = std::make_unique< uint16_t[] >( m_Permutate.epma_size_elms ) ;
 
             // time mesaure
@@ -368,7 +371,11 @@ void GammaCrypt::Decrypt()
         
         #ifdef XOR_ENBLD
         // XOR2
+        
+        #ifdef LFSR_ENBLD
         ( *mpShift )( mp_block_random.get() + m_n_quantum ) ;
+        #endif
+        
         for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
             mp_block_source[i] = mp_block_source[i] ^ mp_block_random[ i + offs_key2 / m_quantum_size ] ;
         
@@ -377,16 +384,9 @@ void GammaCrypt::Decrypt()
         #ifdef PERMUTATE_ENBLD
         //REPOSITIONING
         
-        //inverse pma2
-/*        m_Permutate.InverseExpPermutArr( t_invs_pma2.get() , m_Permutate.e_array2.get() ) ;
-            #ifdef DBG_INFO_ENBLD
-            // cout pma
-            std::cout << "\n invrs pma2 \n" ;
-            for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
-                std::cout << t_invs_pma2[ i ] << ' ' ;
-            std::cout << std::endl ;
-            #endif // DBG_INFO_ENBLD
-*/
+        // transform pma2
+        m_Permutate.eTransformPMA2() ;
+
         //rearrange pma1
         m_Permutate.eRearrangePMA1( e_temp_block_pma.get() , m_Permutate.e_array2.get() ) ;
             #ifdef DBG_INFO_ENBLD
@@ -413,7 +413,11 @@ void GammaCrypt::Decrypt()
         
         #ifdef XOR_ENBLD
         // XOR1
+
+        #ifdef LFSR_ENBLD
         ( *mpShift )( mp_block_random.get() ) ;
+        #endif // LFSR_ENBLD
+
         for ( unsigned i = 0 ; i < m_n_quantum ; i++ )
             mp_block_dest[i] = mp_block_source[i] ^ mp_block_random[i] ;
             

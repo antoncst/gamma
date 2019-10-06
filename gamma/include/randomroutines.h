@@ -76,7 +76,7 @@ public:
     BitsetItmesArray m_BIarray ;
     BitsetItmesArray m_BIarray2 ;
 
-    void Init( size_t block_size , unsigned char * pc_randoms ) ;
+    void Init( size_t block_size ) ;
     // Make Permutation Array
     void MakePermutArr( uint16_t * earr , unsigned char * pc_randoms , BitsetItmesArray & bi_arr ) ;
     void InversePermutArr( BitsetItmesArray & bi_arr ) ;
@@ -86,4 +86,6 @@ public:
 
     // rearrange PMA1 via PMA2
     void eRearrangePMA1( uint16_t * temp_block , uint16_t * p_pm_earr ) noexcept ;
+    //
+    void eTransformPMA2() ;
 } ;

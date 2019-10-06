@@ -307,16 +307,14 @@ void TransformRandomCycle( unsigned * block_random , const size_t n_quantum )
 
 //------------- REPOSITIONING --------------------
 
-void Permutate::Init( size_t block_size , unsigned char * pc_randoms )
+void Permutate::Init( size_t block_size )
 {
-    mpc_randoms = pc_randoms ;
     //Extended (in memory) Permutation Array size, elements
     epma_size_elms = block_size * 8 ; // block size bytes * 8 bits
     m_BIarray.Init( block_size ) ;
     m_BIarray2.Init( block_size ) ;
     e_array = std::make_unique< uint16_t[] >( m_BIarray.max_index) ;
     e_array2 = std::make_unique< uint16_t[] >( m_BIarray2.max_index) ;
-    
 } 
 
 void Permutate::InversePermutArr( BitsetItmesArray & bi_arr )
@@ -335,14 +333,10 @@ void Permutate::InversePermutArr( BitsetItmesArray & bi_arr )
 
 void Permutate::InverseExpPermutArr( uint16_t * p_earr , uint16_t * p_pm_earr ) noexcept
 {
-    //auto inverse_earr  = std::make_unique< uint16_t[] >( epma_size_elms );
-    
-    //inverse_pma.reserve( max_index ) ;
     for ( unsigned i = 0 ; i < epma_size_elms ;  ++i )
     {
         p_earr[ p_pm_earr[ i ] ] = i ;
     }
-    //memcpy( p_earr , inverse_earr.get() , epma_size_elms * sizeof( uint16_t ) ) ; // todo move
 } 
 
 void Permutate::MakePermutArr( uint16_t * earr , unsigned char * pc_randoms , BitsetItmesArray & bi_arr )
@@ -447,6 +441,42 @@ void Permutate::eRearrange( unsigned char * p_block , unsigned char * temp_block
     }
     memcpy(  p_block , temp_block , m_BIarray.block_size_bytes ) ; //todo realize move semantic
     
+}
+
+void Permutate::eTransformPMA2()
+{
+    const unsigned N = epma_size_elms ;
+    unsigned op = 0 ;
+
+    if ( op == 0  )
+    {
+        op = 1 ;
+        for ( unsigned i = 0 ; i < N / 2 ; ++i )
+        {
+            unsigned temp = e_array2[ i * 2 ] ;
+            e_array2[ i * 2 ] = e_array2[ i * 2 + 1 ] ;
+            e_array2[ i * 2 + 1 ] = temp ;
+        }
+    }
+    else if ( op == 1  )
+    {
+        op = 0 ;
+
+        unsigned temp = e_array2[ 0 ] ;
+        e_array2[ 0 ] = e_array2[ 2 ] ;
+        e_array2[ 2 ] = temp ;
+
+        temp = e_array2[ 1 ] ;
+        e_array2[ 1 ] = e_array2[ N-1 ] ;
+        e_array2[ N-1 ] = temp ;
+
+        for ( unsigned i = 0 ; i < N / 2 - 1 ; ++i )
+        {
+            unsigned temp = e_array2[ i * 2 + 1] ;
+            e_array2[ i * 2 + 1] = e_array2[ i * 2 + 2 ] ;
+            e_array2[ i * 2 + 2 ] = temp ;
+        }
+    }
 }
 
 
@@ -586,4 +616,3 @@ inline void BitArray::set(unsigned index, uint16_t nbits, uint16_t value ) noexc
 
     }
 } ;
-
