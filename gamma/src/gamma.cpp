@@ -7,6 +7,8 @@
 #include <memory>
 #include <chrono>
 #include <sstream>
+#include <thread>
+#include <atomic>
 //#include <array> // for debug only
 //#include <iostream>  // for debug only
 
@@ -14,11 +16,7 @@
 #include "LFSR.h"
 #include "../../Display/ConsoleDisplay/include/display.h"
 
-#define PERMUTATE_ENBLD
-#define XOR_ENBLD
-#define LFSR_ENBLD
-
-//#define DBG_INFO_ENBLD
+#include "../platform.h"
 
 using namespace std ;
 
@@ -161,14 +159,15 @@ void GammaCrypt::Encrypt()
             // time mesaure
             auto mcs1 = std::chrono::high_resolution_clock::now() ;
             //
-    GenerateRandoms( m_n_quantum * 2 + m_Permutate.m_BIarray.pma_size_bytes * 2 / m_quantum_size + tail_size_words , mp_block_random.get() ) ;
+    mGenerateRandoms() ;
+    //GenerateRandoms( m_n_quantum * 2 + m_Permutate.m_BIarray.pma_size_bytes * 2 / m_quantum_size + tail_size_words , mp_block_random.get()  ) ;
             // time mesaure
             auto mcs2 = std::chrono::high_resolution_clock::now() ;
             std::chrono::duration<double> mcs = mcs2 - mcs1 ;
             uint64_t drtn = mcs.count() * 1000000 ;
             std::cout << "Duration: " << drtn << std::endl ;
             //
-    
+    return ;
     //display_str("making permutation array...") ;
             // time mesaure
             //mcs1 = std::chrono::high_resolution_clock::now() ;
@@ -618,6 +617,42 @@ void GammaCrypt::SetBlockSize( unsigned block_size )
         m_block_size <<= 1 ;
     if ( m_block_size < 8)
         m_block_size = 8 ;
+}
+
+
+void GammaCrypt::mGenerateRandoms()
+{
+    unsigned hardware_concurrency = std::thread::hardware_concurrency() ;
+    if ( hardware_concurrency == 0 )
+        hardware_concurrency = 1 ;
+        
+    std::cout << "hardware_concurrency: " << hardware_concurrency << std::endl ;
+    
+    std::atomic< bool > bstop( false ) ;
+    
+    unsigned tail_size_bytes = m_header.source_file_size % m_block_size ;
+    unsigned tail_size_words = tail_size_bytes / sizeof( unsigned ) ;
+    if ( tail_size_bytes % sizeof( unsigned ) != 0 )
+        tail_size_words ++ ;
+
+    std::vector<std::thread> threads;
+    for( unsigned i = 0; i < hardware_concurrency ; i++ ) 
+    {
+        std::thread thr_cfl( CPUFullLoad , std::ref( bstop ) ) ; // thread CPU Loading at 100%
+        threads.emplace_back( std::move( thr_cfl ) ) ;
+    }
+
+    
+    //std::thread thr_GenerateRandoms( GenerateRandoms , m_n_quantum * 2 + m_Permutate.m_BIarray.pma_size_bytes * 2 / m_quantum_size + tail_size_words , mp_block_random.get()  ) ;
+    GenerateRandoms( m_n_quantum * 2 + m_Permutate.m_BIarray.pma_size_bytes * 2 / m_quantum_size + tail_size_words , mp_block_random.get()  ) ;
+    
+    bstop = true ;
+
+    for ( auto & thr : threads ) 
+    {
+        thr.join();
+    }
+
 }
 
 void GammaCrypt::DisplayInfo()

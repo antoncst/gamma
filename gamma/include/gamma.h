@@ -17,6 +17,7 @@ public:
     void Encrypt() ;
     void Decrypt() ;
     void SetBlockSize( unsigned block_size ) ;
+    void mGenerateRandoms() ;
 
 private:    
     size_t m_block_size = 64 ;    // in bytes , further calculated in Initialize method, deponds on file size

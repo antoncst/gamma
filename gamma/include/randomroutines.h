@@ -3,8 +3,11 @@
 #include <stdint.h>
 #include <vector>
 #include <memory>
+#include <atomic>
 
 typedef unsigned t_block[] ;
+
+void CPUFullLoad( std::atomic< bool > & bstop ) ;
 
 // generate random
 // in:  rsize - size of block 'in unsigned'

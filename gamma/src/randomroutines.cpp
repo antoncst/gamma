@@ -43,11 +43,11 @@ bool MakeDistrbution_4lowbits( unsigned const N , t_block const rvals , unsigned
         dvals[ index ] ++ ;
     }
     
-    #ifdef DEBUG
-    std::cout << "bit" << nshift << std::endl ;
+    #ifdef DBG_INFO_ENBLD
+    std::cout << "\n bit" << nshift << ' ' ;
     std::cout << "statistics:\n" ;
     for ( auto dval : dvals )
-        std::cout << dval << std::endl ;
+        std::cout << dval << ' ' ;
     #endif
     
     for ( auto dval : dvals )
@@ -78,11 +78,11 @@ bool MakeDistrbution_5lowbits( unsigned const N , t_block const rvals , unsigned
         dvals[ index ] ++ ;
     }
     
-    #ifdef DEBUG
-    std::cout << "bit" << nshift << std::endl ;
+    #ifdef DBG_INFO_ENBLD
+    std::cout << "\n bit" << nshift << ' ' ;
     std::cout << "statistics:\n" ;
     for ( auto dval : dvals )
-        std::cout << dval << std::endl ;
+        std::cout << dval << ' ' ;
     #endif
 
     // Вообще я полагаю отклонение представляет из себя нормальное распределение
@@ -111,6 +111,10 @@ bool MakeDistrbution_5lowbits( unsigned const N , t_block const rvals , unsigned
 // N - array size // размер массива
 void GenRandByHdd( unsigned const N , t_block rvals )
 {
+    unsigned sleep_drtn = 300 ;
+    #ifdef WINDOWS
+    sleep_drtn = 8000 ;
+    #endif
     //rarray_t rvals ;
     auto mcs1 = std::chrono::high_resolution_clock::now() ;
     for ( unsigned i = 0 ; i < N/2 ; ++i )
@@ -119,7 +123,7 @@ void GenRandByHdd( unsigned const N , t_block rvals )
         std::ofstream ofs ;
         ofs.open( "temp_1", std::ios::out | std::ios::trunc) ;
         ofs << "ttt" ;
-        std::this_thread::sleep_for( std::chrono::microseconds( 200 ) ) ;
+        std::this_thread::sleep_for( std::chrono::microseconds( sleep_drtn ) ) ;
         ofs.flush() ;
         ofs.close() ;
         
@@ -135,7 +139,7 @@ void GenRandByHdd( unsigned const N , t_block rvals )
             std::ofstream ofs2 ;
             ofs2.open( "temp_2", std::ios::out | std::ios::trunc) ;
             ofs2 << "ttt" ;
-            std::this_thread::sleep_for( std::chrono::microseconds( 200 ) ) ;
+            std::this_thread::sleep_for( std::chrono::microseconds( sleep_drtn ) ) ;
             ofs2.flush() ;
             ofs2.close() ;
 
@@ -197,8 +201,19 @@ void CropRandoms( unsigned const N , t_block rvals )
     unsigned * pmin = std::min_element( rvals , rvals + N ) ;
     for ( unsigned i = 0 ; i < N ; i++ )
     {
-        rvals[ i ] -= * pmin ;
+        if (rvals[ i ] != *pmin)
+        {
+            rvals[ i ] -= *pmin * 2/3 ;
+        }
     }
+
+        #ifdef DBG_INFO_ENBLD
+        std::cout << " Randoms after sub mib : \n" ;
+        for ( unsigned i = 0 ; i < N ; ++ i )
+        {
+            std::cout << rvals[ i ] << ' ' ;
+        }
+        #endif
 
     //уберём младшие "малозначащие" биты
     unsigned LowSignificantBit = DetermineNonsignificantLowBits( N ,rvals ) ;
@@ -253,6 +268,33 @@ unsigned CompoundContiguousRandoms( unsigned const rsize , t_block block , unsig
     return current_block_index ;
 }
 
+// looped function
+void CPUFullLoad( std::atomic< bool > & bstop )
+{
+    //unsigned temp ;
+    while ( true )
+    {
+        if ( bstop )
+            break ;
+        {
+            std::ofstream ofs ;
+            ofs.open( "temp_1", std::ios::out | std::ios::trunc) ;
+            ofs << "ttt" ;
+            std::this_thread::sleep_for( std::chrono::microseconds( 200 ) ) ;
+            ofs.flush() ;
+            ofs.close() ;
+            
+            std::ofstream ofs2 ;
+            ofs2.open( "temp_2", std::ios::out | std::ios::trunc) ;
+            ofs2 << "ttt" ;
+            std::this_thread::sleep_for( std::chrono::microseconds( 200 ) ) ;
+            ofs2.flush() ;
+            ofs2.close() ;
+
+        }
+    } ;
+}
+
 //Генерировать блок СЧ заданной длины в словах (unsigned)
 //rsize (random block size) - размер массива
 void GenerateRandoms( unsigned const rsize , t_block randoms )
@@ -266,18 +308,23 @@ void GenerateRandoms( unsigned const rsize , t_block randoms )
         auto rvals = std::make_unique< t_block >( N ) ;
         GenRandByHdd( N , rvals.get() ) ;
 
+        #ifdef DBG_INFO_ENBLD
         std::cout << " Randoms by HDD : \n" ;
         for ( unsigned i = 0 ; i < N ; ++ i )
         {
             std::cout << rvals[ i ] << ' ' ;
         }
-        std::cout << std::endl << " Randoms by HDD in hex : \n" ;
+        /*std::cout << std::endl << " Randoms by HDD in hex : \n" ;
         for ( unsigned i = 0 ; i < N ; ++ i )
         {
             std::cout << std::hex << rvals[ i ] << ' ' ;
-        }
+        }*/
+        std::cout << std::dec << std::endl ;
+        #endif
         
         CropRandoms( N ,rvals.get() ) ;
+
+
         unsigned received_rsize = CompoundContiguousRandoms( rsize , randoms , N , rvals.get() ) ;
         if ( received_rsize == rsize ) 
             break;
