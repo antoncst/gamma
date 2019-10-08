@@ -16,13 +16,21 @@ public:
 
     void Encrypt() ;
     void Decrypt() ;
+    void EncryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_temp_block ) noexcept ;
+    
     void SetBlockSize( unsigned block_size ) ;
     void mGenerateRandoms() ;
+    
+    unsigned m_rnd_size_words ; // word - sizeof( unsigned )
+    unsigned m_tail_size_words ;
+    unsigned m_tail_size_bytes ;
 
 private:    
     size_t m_block_size = 64 ;    // in bytes , further calculated in Initialize method, deponds on file size
     bool mb_need_init_blocksize = true ; // for if block_size specified in command line or for decrypt
     bool mb_decrypting = false ;
+    
+    unsigned m_hardware_concurrency ;
 
     static const size_t m_quantum_size = sizeof ( unsigned) ; // block size of one calculating operation (probably 32 or 64 bit) 
                                             // размер блока одной вычислительной операции (наверняка 32 или 64 бита)
