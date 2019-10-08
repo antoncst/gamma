@@ -29,7 +29,6 @@ GammaCrypt::GammaCrypt( istream & ifs , ostream & ofs ,  const string & password
 
 void GammaCrypt::Initialize()
 {
-    
 /*
     // calculate our 'constants;)'
     if ( file_size > 262143 ) // 256K - 1M
@@ -167,7 +166,7 @@ void GammaCrypt::Encrypt()
             uint64_t drtn = mcs.count() * 1000000 ;
             std::cout << "Duration: " << drtn << std::endl ;
             //
-    return ;
+    
     //display_str("making permutation array...") ;
             // time mesaure
             //mcs1 = std::chrono::high_resolution_clock::now() ;
@@ -622,13 +621,18 @@ void GammaCrypt::SetBlockSize( unsigned block_size )
 
 void GammaCrypt::mGenerateRandoms()
 {
+    std::atomic< bool > bstop ( false ) ;
+    //timer
+    std::atomic< uint64_t > ticks( 0 ) ;
+
+    std::thread thr_tick( TickTimer , std::ref( ticks ) , std::ref( bstop ) ) ;
+    //thr_tick.detach() ;
+    
     unsigned hardware_concurrency = std::thread::hardware_concurrency() ;
     if ( hardware_concurrency == 0 )
         hardware_concurrency = 1 ;
         
     std::cout << "hardware_concurrency: " << hardware_concurrency << std::endl ;
-    
-    std::atomic< bool > bstop( false ) ;
     
     unsigned tail_size_bytes = m_header.source_file_size % m_block_size ;
     unsigned tail_size_words = tail_size_bytes / sizeof( unsigned ) ;
@@ -636,7 +640,7 @@ void GammaCrypt::mGenerateRandoms()
         tail_size_words ++ ;
 
     std::vector<std::thread> threads;
-    for( unsigned i = 0; i < hardware_concurrency ; i++ ) 
+    for( unsigned i = 0; i < hardware_concurrency - 1 ; i++ ) 
     {
         std::thread thr_cfl( CPUFullLoad , std::ref( bstop ) ) ; // thread CPU Loading at 100%
         threads.emplace_back( std::move( thr_cfl ) ) ;
@@ -644,9 +648,11 @@ void GammaCrypt::mGenerateRandoms()
 
     
     //std::thread thr_GenerateRandoms( GenerateRandoms , m_n_quantum * 2 + m_Permutate.m_BIarray.pma_size_bytes * 2 / m_quantum_size + tail_size_words , mp_block_random.get()  ) ;
-    GenerateRandoms( m_n_quantum * 2 + m_Permutate.m_BIarray.pma_size_bytes * 2 / m_quantum_size + tail_size_words , mp_block_random.get()  ) ;
+    GenerateRandoms( m_n_quantum * 2 + m_Permutate.m_BIarray.pma_size_bytes * 2 / m_quantum_size + tail_size_words , mp_block_random.get() , std::ref( ticks ) ) ;
     
     bstop = true ;
+
+    thr_tick.join() ;
 
     for ( auto & thr : threads ) 
     {

@@ -8,15 +8,16 @@
 typedef unsigned t_block[] ;
 
 void CPUFullLoad( std::atomic< bool > & bstop ) ;
+void TickTimer( std::atomic< uint64_t > & ticks , std::atomic< bool > & bstop ) ;
 
 // generate random
 // in:  rsize - size of block 'in unsigned'
 // out: randoms
-void GenerateRandoms( const unsigned rsize , t_block randoms) ;
+void GenerateRandoms( const unsigned rsize , t_block randoms , std::atomic< uint64_t > & ticks ) ;
 
-void TransformRandom( unsigned * block_random , const size_t n_quantum ) ;
+//void TransformRandom( unsigned * block_random , const size_t n_quantum ) ;
 
-void TransformRandomCycle( unsigned * block_random , const size_t n_quantum ) ;
+//void TransformRandomCycle( unsigned * block_random , const size_t n_quantum ) ;
 
 
 

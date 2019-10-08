@@ -15,9 +15,16 @@
 
 #include <thread> //for sleep
 
+#ifdef WINDOWS
+#include <windows.h>
+#endif
+
 
 //---------------------------------------------------------------------
 //GENERATING RANDOM
+
+/*
+ * obsolete :
 
 // отклонение от идеально равномерного распределения, процентов
 const unsigned deviation = 40 ;
@@ -106,7 +113,59 @@ bool MakeDistrbution_5lowbits( unsigned const N , t_block const rvals , unsigned
 
     return true ;
 }
+*/
 
+//generate randoms using hdd operatios
+// N - array size // размер массива
+void GenRandByHdd( unsigned const N , t_block rvals , std::atomic< uint64_t > & ticks )
+{
+    unsigned sleep_drtn = 1 ;
+    //rarray_t rvals ;
+    uint64_t mcs1 = ticks ;
+    uint64_t mcs2 ;
+    for ( unsigned i = 0 ; i < N/2 ; ++i )
+    {
+        unsigned rval = 0 ; //random value
+        for ( int j = 0 ; j < 1000 && rval == 0; ++j )
+        {
+            std::ofstream ofs ;
+            ofs.open( "temp_1", std::ios::out | std::ios::trunc) ;
+            ofs << "ttt" ;
+            std::this_thread::sleep_for( std::chrono::microseconds( sleep_drtn ) ) ;
+            ofs.flush() ;
+            ofs.close() ;
+            
+            mcs2 = ticks ;
+            rval = mcs2 - mcs1 ; 
+            mcs1 = mcs2 ;
+        
+        }
+        
+        rvals[ i*2 ] = rval ;
+
+        {
+            rval = 0 ; //random value
+            for ( int j = 0 ; j < 1000 && rval == 0; ++j )
+            {
+                std::ofstream ofs2 ;
+                ofs2.open( "temp_2", std::ios::out | std::ios::trunc) ;
+                ofs2 << "ttt" ;
+                std::this_thread::sleep_for( std::chrono::microseconds( sleep_drtn ) ) ;
+                ofs2.flush() ;
+                ofs2.close() ;
+
+                mcs2 = ticks ;
+                rval = mcs2 - mcs1 ; //random value
+                mcs1 = mcs2 ;
+            }
+            
+            rvals[ i*2 +1 ] = rval ;
+        }
+    } ;
+}
+
+/*
+ obsolete :
 //generate randoms using hdd operatios
 // N - array size // размер массива
 void GenRandByHdd( unsigned const N , t_block rvals )
@@ -130,7 +189,7 @@ void GenRandByHdd( unsigned const N , t_block rvals )
         auto mcs2 = std::chrono::high_resolution_clock::now() ;
         std::chrono::duration<double> mcs = mcs2 - mcs1 ;
         mcs1 = mcs2 ;
-        /*uint64_t*/ unsigned rval ; //random value
+        unsigned rval ; //random value
         rval = mcs.count() * 1'000'000'000 ;
         
         rvals[ i*2 ] = rval ;
@@ -152,7 +211,7 @@ void GenRandByHdd( unsigned const N , t_block rvals )
         }
     }
 }
-
+*/
 
 // определить старший, установленный в 1, бит
 int DetermineHighSetBit( unsigned const val )
@@ -166,6 +225,8 @@ int DetermineHighSetBit( unsigned const val )
             if ( (val & umask) > 0 )
                 return n ;
     }
+    std::cout << "\n too small random "  << val << std::endl ;
+    return 0 ;
     throw "error: too small random value to perform DetermineHighSetBit" ;
 }
 
@@ -180,6 +241,7 @@ unsigned CalcQuadAverage( unsigned const N , t_block const rvals )
     return result / N / 2 ;
 }
 
+/*
 //Определить количество младших незначащих битов
 //Возвращает номер (считая от нуля) первого значащего бита
 //возвращает -1, если вообще не получились случайные числа
@@ -194,6 +256,7 @@ int DetermineNonsignificantLowBits( unsigned const N , t_block const rvals )
             return i ;
     throw "error: fail to make statistic distribution" ;
 }
+*/
 
 void CropRandoms( unsigned const N , t_block rvals )
 {
@@ -208,19 +271,20 @@ void CropRandoms( unsigned const N , t_block rvals )
     }
 
         #ifdef DBG_INFO_ENBLD
-        std::cout << " Randoms after sub mib : \n" ;
+        std::cout << " Randoms after sub min : \n" ;
         for ( unsigned i = 0 ; i < N ; ++ i )
         {
             std::cout << rvals[ i ] << ' ' ;
         }
         #endif
 
-    //уберём младшие "малозначащие" биты
+/*    //уберём младшие "малозначащие" биты
     unsigned LowSignificantBit = DetermineNonsignificantLowBits( N ,rvals ) ;
     for ( unsigned i = 0 ; i < N ; i++ )
     {
         rvals[ i ] >>= LowSignificantBit ;
     }
+*/
 }
 
 // Взять из полученных случайных всё полезное и сформировать непрерывную кнаку
@@ -268,6 +332,16 @@ unsigned CompoundContiguousRandoms( unsigned const rsize , t_block block , unsig
     return current_block_index ;
 }
 
+void TickTimer( std::atomic< uint64_t > & ticks , std::atomic< bool > & bstop )
+{
+    while ( true )
+    {
+        ++ ticks ;
+        if ( bstop )
+            break ;
+    }
+}
+
 // looped function
 void CPUFullLoad( std::atomic< bool > & bstop )
 {
@@ -297,7 +371,7 @@ void CPUFullLoad( std::atomic< bool > & bstop )
 
 //Генерировать блок СЧ заданной длины в словах (unsigned)
 //rsize (random block size) - размер массива
-void GenerateRandoms( unsigned const rsize , t_block randoms )
+void GenerateRandoms( unsigned const rsize , t_block randoms , std::atomic< uint64_t > & ticks )
 {
     unsigned alignedsize = 192 ; // минимальный размер массива для ГСЧ
     if ( alignedsize < rsize)
@@ -306,7 +380,7 @@ void GenerateRandoms( unsigned const rsize , t_block randoms )
     while ( 1 )
     {
         auto rvals = std::make_unique< t_block >( N ) ;
-        GenRandByHdd( N , rvals.get() ) ;
+        GenRandByHdd( N , rvals.get() , ticks ) ;
 
         #ifdef DBG_INFO_ENBLD
         std::cout << " Randoms by HDD : \n" ;
