@@ -626,7 +626,6 @@ void GammaCrypt::mGenerateRandoms()
     std::atomic< uint64_t > ticks( 0 ) ;
 
     std::thread thr_tick( TickTimer , std::ref( ticks ) , std::ref( bstop ) ) ;
-    //thr_tick.detach() ;
     
     unsigned hardware_concurrency = std::thread::hardware_concurrency() ;
     if ( hardware_concurrency == 0 )
@@ -646,9 +645,20 @@ void GammaCrypt::mGenerateRandoms()
         threads.emplace_back( std::move( thr_cfl ) ) ;
     }
 
-    
-    //std::thread thr_GenerateRandoms( GenerateRandoms , m_n_quantum * 2 + m_Permutate.m_BIarray.pma_size_bytes * 2 / m_quantum_size + tail_size_words , mp_block_random.get()  ) ;
-    GenerateRandoms( m_n_quantum * 2 + m_Permutate.m_BIarray.pma_size_bytes * 2 / m_quantum_size + tail_size_words , mp_block_random.get() , std::ref( ticks ) ) ;
+    try
+    {
+        GenerateRandoms( m_n_quantum * 2 + m_Permutate.m_BIarray.pma_size_bytes * 2 / m_quantum_size + tail_size_words , mp_block_random.get() , std::ref( ticks ) ) ;
+    }
+    catch( const char * s)
+    {
+        bstop = true ;
+        thr_tick.join() ;
+        for ( auto & thr : threads ) 
+        {
+            thr.join();
+        }
+        throw s ;
+    }
     
     bstop = true ;
 

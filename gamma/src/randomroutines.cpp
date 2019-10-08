@@ -218,15 +218,12 @@ int DetermineHighSetBit( unsigned const val )
 {
     if ( val > 0 )
     {
-                                      // 31                             8 7  4    0
         unsigned umask = 0x8000'0000 ; //  1000 0000 0000 0000   0000 0000 0000 0000
         int n = 31 ;
         for ( n = 31 ; n >= 0 ; n-- , umask >>= 1 )
             if ( (val & umask) > 0 )
                 return n ;
     }
-    std::cout << "\n too small random "  << val << std::endl ;
-    return 0 ;
     throw "error: too small random value to perform DetermineHighSetBit" ;
 }
 
