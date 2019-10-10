@@ -20,6 +20,7 @@ public:
     
     void SetBlockSize( unsigned block_size ) ;
     void mGenerateRandoms() ;
+    void MakePswBlock() ;
     
     unsigned m_rnd_size_words ; // word - sizeof( unsigned )
     unsigned m_tail_size_words ;

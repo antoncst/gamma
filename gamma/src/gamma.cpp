@@ -128,7 +128,10 @@ void GammaCrypt::Initialize()
     offs_pma2 = m_block_size * 2 + m_Permutate.m_BIarray.pma_size_bytes ;
     offs_ktail = m_block_size * 2 + m_Permutate.m_BIarray.pma_size_bytes * 2 ;
 
+}
 
+void GammaCrypt::MakePswBlock()
+{
     // password block initialization
     memset( mp_block_password.get() , 0 , m_block_size ) ;
     size_t i = 0 ;
@@ -143,10 +146,72 @@ void GammaCrypt::Initialize()
         i += bytes_to_copy ;
     }
     assert( i == m_block_size ) ;
+            // time mesaure
+            std::cout << "\n making psw_block... \n" ;
+            auto mcs1 = std::chrono::high_resolution_clock::now() ;
+            //
+
+
     // transform psw block in cycle
     // This results in a delay that is usefull against 'dictionary' atack
-    for ( unsigned i = 0 ; i < 4093 ; ++i )
+    
+    const unsigned n_iterations  = 4096 * 7 - 19 ;
+
+    for ( unsigned i = 0 ; i < n_iterations ; ++i )
         ( *mpShift )( mp_block_password.get() ) ;
+
+    const unsigned block_size_bytes = m_block_size ;
+    Permutate Pmt ;
+    Pmt.Init( block_size_bytes ) ;
+
+    const unsigned & pma_size_bytes = Pmt.m_BIarray.pma_size_bytes ; 
+
+    auto up_blocl_rnd = std::make_unique< unsigned char[] >( pma_size_bytes ) ;
+
+    for ( unsigned i = 0 ; i < pma_size_bytes ; i += block_size_bytes )
+    {
+        bytes_to_copy = ( i + block_size_bytes > pma_size_bytes ) ? (i + block_size_bytes) - pma_size_bytes  : block_size_bytes ;
+        std::memcpy( up_blocl_rnd.get() + i , mp_block_password.get() , block_size_bytes ) ;
+    }
+
+    auto up_blocl_rnd2 = std::make_unique< unsigned char[] >( pma_size_bytes ) ;
+
+    for ( unsigned i = 0 ; i < n_iterations ; ++i )
+        ( *mpShift )( mp_block_password.get() ) ;
+
+    for ( unsigned i = 0 ; i < pma_size_bytes ; i += block_size_bytes )
+    {
+        bytes_to_copy = ( i + block_size_bytes > pma_size_bytes ) ? (i + block_size_bytes) - pma_size_bytes  : block_size_bytes ;
+        std::memcpy( up_blocl_rnd2.get() + i , mp_block_password.get() , block_size_bytes ) ;
+    }
+
+    Pmt.mpc_randoms = up_blocl_rnd2.get() ;
+    Pmt.MakePermutArr( Pmt.e_array2.get() , Pmt.mpc_randoms , Pmt.m_BIarray ) ; // curr bug
+    
+    Pmt.mpc_randoms = up_blocl_rnd.get() ;
+    Pmt.MakePermutArr( Pmt.e_array.get() , Pmt.mpc_randoms , Pmt.m_BIarray ) ; // curr bug
+    
+    auto temp_block = std::make_unique< unsigned char[] >( block_size_bytes ) ; 
+    auto e_temp_block_pma = std::make_unique< uint16_t[] >( Pmt.epma_size_elms ) ; // for ePMA2
+
+    for ( unsigned i = 0 ; i < n_iterations ; ++ i )
+    {
+        ( *mpShift )( mp_block_password.get() ) ;
+
+
+        Pmt.eTransformPMA2() ;
+        Pmt.eRearrangePMA1( e_temp_block_pma.get() , Pmt.e_array2.get() ) ;
+
+        Pmt.eRearrange( ( ( unsigned char*) mp_block_password.get() ) , temp_block.get() , Pmt.e_array.get() ) ;
+    }
+   
+            // time mesaure
+            auto mcs2 = std::chrono::high_resolution_clock::now() ;
+            std::chrono::duration<double> mcs = mcs2 - mcs1 ;
+            uint64_t drtn = mcs.count() * 1000000 ;
+            std::cout << "Duration: " << drtn << std::endl ;
+            //
+    
 }
 
 void GammaCrypt::EncryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_temp_block ) noexcept
@@ -234,7 +299,6 @@ void GammaCrypt::Encrypt()
             uint64_t drtn = mcs.count() * 1000000 ;
             std::cout << "Duration: " << drtn << std::endl ;
             //
-    
     display_str("making permutation array...") ;
             // time mesaure
             mcs1 = std::chrono::high_resolution_clock::now() ;
@@ -246,6 +310,8 @@ void GammaCrypt::Encrypt()
         m_Permutate.MakePermutArr( m_Permutate.e_array.get() , m_Permutate.mpc_randoms + m_block_size * 2 , m_Permutate.m_BIarray ) ;
         m_Permutate.MakePermutArr( m_Permutate.e_array2.get() , m_Permutate.mpc_randoms + m_block_size * 2 + m_Permutate.m_BIarray.pma_size_bytes , m_Permutate.m_BIarray2 ) ;
     }
+    
+    MakePswBlock() ;
     
 
         #ifdef DBG_INFO_ENBLD
@@ -360,7 +426,9 @@ void GammaCrypt::Decrypt()
     mb_need_init_blocksize = false ;
     
     Initialize() ;
-    //m_Permutate.Init( m_block_size , ) ;
+
+    MakePswBlock() ;
+
     ReadOverheadData() ;
     
         #ifdef DBG_INFO_ENBLD
