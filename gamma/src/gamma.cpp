@@ -155,7 +155,7 @@ void GammaCrypt::MakePswBlock()
     // transform psw block in cycle
     // This results in a delay that is usefull against 'dictionary' atack
     
-    const unsigned n_iterations  = 4096 * 7 - 19 ;
+    const unsigned n_iterations  = 4096 * 5 - 19 ;
 
     for ( unsigned i = 0 ; i < n_iterations ; ++i )
         ( *mpShift )( mp_block_password.get() ) ;
@@ -170,18 +170,21 @@ void GammaCrypt::MakePswBlock()
 
     for ( unsigned i = 0 ; i < pma_size_bytes ; i += block_size_bytes )
     {
+        for ( unsigned i = 0 ; i < n_iterations ; ++i )
+            ( *mpShift )( mp_block_password.get() ) ;
+
         bytes_to_copy = ( i + block_size_bytes > pma_size_bytes ) ? (i + block_size_bytes) - pma_size_bytes  : block_size_bytes ;
         std::memcpy( up_blocl_rnd.get() + i , mp_block_password.get() , block_size_bytes ) ;
     }
 
     auto up_blocl_rnd2 = std::make_unique< unsigned char[] >( pma_size_bytes ) ;
 
-    for ( unsigned i = 0 ; i < n_iterations ; ++i )
-        ( *mpShift )( mp_block_password.get() ) ;
-
     for ( unsigned i = 0 ; i < pma_size_bytes ; i += block_size_bytes )
     {
         bytes_to_copy = ( i + block_size_bytes > pma_size_bytes ) ? (i + block_size_bytes) - pma_size_bytes  : block_size_bytes ;
+        for ( unsigned i = 0 ; i < n_iterations ; ++i )
+            ( *mpShift )( mp_block_password.get() ) ;
+
         std::memcpy( up_blocl_rnd2.get() + i , mp_block_password.get() , block_size_bytes ) ;
     }
 
