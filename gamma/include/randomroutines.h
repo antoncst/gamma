@@ -65,6 +65,10 @@ public:
     BitArray m_pmaBA ;
 } ;
 
+// N = epma_size_elms
+// op - 0..1 ,  operation within eTransformPMA2 , two different algorihms
+void eTransformPMA2( uint16_t * e_array2 , const unsigned N , unsigned & op) ;
+
 
 class Permutate
 {
@@ -90,6 +94,4 @@ public:
 
     // rearrange PMA1 via PMA2
     void eRearrangePMA1( uint16_t * temp_block , uint16_t * p_pm_earr ) noexcept ;
-    //
-    void eTransformPMA2() ;
 } ;

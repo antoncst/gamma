@@ -393,7 +393,7 @@ void GenerateRandoms( unsigned const rsize , t_block randoms , std::atomic< uint
         std::cout << std::dec << std::endl ;
         #endif
         
-        CropRandoms( N ,rvals.get() ) ;
+        //CropRandoms( N ,rvals.get() ) ; // it's ought not to do now 
 
 
         unsigned received_rsize = CompoundContiguousRandoms( rsize , randoms , N , rvals.get() ) ;
@@ -573,10 +573,9 @@ void Permutate::eRearrange( unsigned char * p_block , unsigned char * temp_block
     
 }
 
-void Permutate::eTransformPMA2()
+// N - epma_size_elms
+void eTransformPMA2( uint16_t * e_array2 , const unsigned N , unsigned & op )
 {
-    const unsigned N = epma_size_elms ;
-    unsigned op = 0 ;
 
     if ( op == 0  )
     {

@@ -9,6 +9,32 @@
 #include <cstring>
 #include <memory>
 
+
+// Parameters for CryptBlock
+struct ParamsForCryBl
+{
+    ParamsForCryBl() {} ;
+    uint16_t * e_temp_block_pma ;
+    unsigned char * e_temp_block ;
+    unsigned hardware_concurrency ;
+    unsigned n_blocks ;
+    unsigned * p_source ;
+    unsigned * p_dest ;
+    //unsigned offset ; // in p_block_source and p_block_dest
+
+    unsigned * pkeys1 , * pkeys2 ;
+    uint16_t * ppma1 , * ppma2 ;
+
+    unsigned blk_sz_words ;
+    unsigned blks_per_thr ;
+    uint16_t * e_array ;
+    uint16_t * e_array2 ;
+    unsigned epma_sz_elmnts ;
+} ;
+
+static ParamsForCryBl params ;
+
+
 class GammaCrypt
 {
 public:
@@ -16,7 +42,6 @@ public:
 
     void Encrypt() ;
     void Decrypt() ;
-    void EncryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_temp_block ) noexcept ;
     
     void SetBlockSize( unsigned block_size ) ;
     void mGenerateRandoms() ;
@@ -25,17 +50,29 @@ public:
     unsigned m_rnd_size_words ; // word - sizeof( unsigned )
     unsigned m_tail_size_words ;
     unsigned m_tail_size_bytes ;
-
+    
 private:    
-    size_t m_block_size = 64 ;    // in bytes , further calculated in Initialize method, deponds on file size
+    size_t m_block_size_bytes = 64 ;    // in bytes , further calculated in Initialize method, deponds on file size
     bool mb_need_init_blocksize = true ; // for if block_size specified in command line or for decrypt
     bool mb_decrypting = false ;
+    bool mb_multithread = false ;
+    static const unsigned m_blks_per_thr = 16 ;
     
-    unsigned m_hardware_concurrency ;
+    std::unique_ptr< t_block >   m_upkeys1 , m_upkeys2 ;
+    std::unique_ptr< uint16_t[] > m_uppma1 , m_uppma2 ;
+
+    // MT- multithread
+    void EncryptBlockMT( uint16_t * e_temp_block_pma , unsigned char * e_temp_block , unsigned n_blocks ) noexcept ;
+
+//    void EncryptBlockOneThr( uint16_t * e_temp_block_pma , unsigned char * e_temp_block , unsigned n_blocks , unsigned Nthr) noexcept ;
+            
+    void EncryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_temp_block , unsigned & op ) noexcept ;
+
+    unsigned m_hrdw_concr ;
 
     static const size_t m_quantum_size = sizeof ( unsigned) ; // block size of one calculating operation (probably 32 or 64 bit) 
                                             // размер блока одной вычислительной операции (наверняка 32 или 64 бита)
-    size_t m_n_quantum = m_block_size / m_quantum_size ;
+    size_t m_blk_sz_words = m_block_size_bytes / m_quantum_size ;
     
     void Initialize() ;
 
@@ -58,7 +95,7 @@ private:
     const std::string & m_password ;
     
     // block random
-    // N = m_n_quantum / 4 
+    // N = m_blk_sz_words / 4 
     // offset in bytes:
     //    KEY1           KEY2                PMA1                             PMA2                         tail KEY
     // 0  ... N-1   N  ...  N*2-1   N*2...N*2+PMAsizeBytes-1   N*2+PMAsizeBytes...N*2+PMAsizeBytes*2-1    N*2+PMAsizeBytes*2 ... N*2+PMAsizeBytes*2+tailSize-1
@@ -74,12 +111,13 @@ private:
 
 
     std::unique_ptr< t_block > mp_block_password ;
+    std::unique_ptr< unsigned char[] > mpc_block_psw_pma ; // c - char
     std::unique_ptr< t_block > mp_block_source ;
     std::unique_ptr< t_block > mp_block_dest ;
     
     Permutate m_Permutate ;
 
-    void PMA_Xor_Password( uint16_t * p_pma_in , unsigned * p_pma_out ) ;
+    void PMA_Xor_Psw( unsigned * p_pma_in , unsigned * p_pma_out ) ;
     
     void DisplayInfo() ;
     
