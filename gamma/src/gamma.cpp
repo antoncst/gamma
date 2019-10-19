@@ -34,7 +34,7 @@ void GammaCrypt::Initialize()
     if ( m_hrdw_concr == 0 )
         m_hrdw_concr = 1 ;
         
-    m_hrdw_concr = 1 ; // FOR DEBUG!!! REMOVE IT
+    //m_hrdw_concr = 2 ; // FOR DEBUG!!! REMOVE IT
     
     if ( m_hrdw_concr > 1 && m_header.source_file_size >= 65536 )
         mb_multithread = true ;
@@ -223,7 +223,7 @@ void GammaCrypt::MakePswBlock()
             eTransformPMA2( Pmt.e_array2.get() , Pmt.epma_size_elms , op ) ;
             Pmt.eRearrangePMA1( e_temp_block_pma.get() , Pmt.e_array2.get() ) ;
 
-            Pmt.eRearrange( ( ( unsigned char*) mp_block_password.get() ) , temp_block.get() , Pmt.e_array.get() ) ;
+            eRearrange( ( ( unsigned char*) mp_block_password.get() ) , temp_block.get() , Pmt.e_array.get() , Pmt.epma_size_elms , block_size_bytes ) ;
             
         }
         memcpy( mpc_block_psw_pma.get() + i , ( unsigned char*) mp_block_password.get() , block_size_bytes ) ;
@@ -239,7 +239,7 @@ void GammaCrypt::MakePswBlock()
         eTransformPMA2( Pmt.e_array2.get() , Pmt.epma_size_elms , op ) ;
         Pmt.eRearrangePMA1( e_temp_block_pma.get() , Pmt.e_array2.get() ) ;
 
-        Pmt.eRearrange( ( ( unsigned char*) mp_block_password.get() ) , temp_block.get() , Pmt.e_array.get() ) ;
+        eRearrange( ( ( unsigned char*) mp_block_password.get() ) , temp_block.get() , Pmt.e_array.get() , Pmt.epma_size_elms , block_size_bytes ) ;
         
     }
     
@@ -281,7 +281,7 @@ void GammaCrypt::EncryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_t
     eTransformPMA2( m_Permutate.e_array2.get() , m_Permutate.epma_size_elms , op ) ;
     m_Permutate.eRearrangePMA1( e_temp_block_pma , m_Permutate.e_array2.get() ) ;
 
-    m_Permutate.eRearrange( (unsigned char*) mp_block_dest.get() , e_temp_block , m_Permutate.e_array.get() ) ;
+    eRearrange( (unsigned char*) mp_block_dest.get() , e_temp_block , m_Permutate.e_array.get() , m_Permutate.epma_size_elms , m_block_size_bytes ) ;
 
     #endif // PERMUTATE_ENBLD
     
@@ -306,7 +306,7 @@ void GammaCrypt::EncryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_t
 void EncryptBlockOneThr( ParamsForCryBl & params , unsigned Nthr ) noexcept
 {
 
-    unsigned op = 0 ;
+    //unsigned op = 0 ;
     for ( unsigned j = 0 ; j < params.blks_per_thr ; ++ j )
     {
         //uidx idx type: unsigneds
@@ -316,15 +316,27 @@ void EncryptBlockOneThr( ParamsForCryBl & params , unsigned Nthr ) noexcept
         {
             params.p_dest[ uidx + i ] =  params.p_source[ uidx + i ] ^ params.pkeys1[ uidx + i]  ;
         }
+        // ---------- REPOSITIONING ----------
+
+        //ну я дурак, eTransformPMA2 уже давно высчитано в ppma2
+        //eTransformPMA2( params.ppma2 + Nthr*params.epma_sz_elmnts , params.epma_sz_elmnts , op ) ;
+        //m_Permutate.eRearrangePMA1( params.e_temp_block_pma + Nthr * params.epma_sz_elmnts  , params.ppma2 + Nthr * params.epma_sz_elmnts ) ;
+
+        //m_Permutate.eRearrange( (unsigned char*) mp_block_dest.get() , e_temp_block , m_Permutate.e_array.get() ) ;
+        eRearrange( reinterpret_cast< unsigned char * >( params.p_dest + uidx)  , params.e_temp_block
+                    , params.ppma1 + Nthr * params.blks_per_thr * params.epma_sz_elmnts + j * params.epma_sz_elmnts 
+                    , params.epma_sz_elmnts , params.blk_sz_words * sizeof( unsigned) ) ;
+
+        // ----------- XOR2 -----------
+        for ( unsigned i = 0 ; i < params.blk_sz_words ; i++ )
+        {
+            params.p_dest[ uidx + i ] ^=  params.pkeys2[ uidx + i]  ;
+        }
     }
+
+
         
-    // ---------- REPOSITIONING ----------
-
-    eTransformPMA2( params.e_array2 , params.epma_sz_elmnts , op ) ;
-/*    m_Permutate.eRearrangePMA1( e_temp_block_pma , m_Permutate.e_array2.get() ) ;
-
-    m_Permutate.eRearrange( (unsigned char*) mp_block_dest.get() , e_temp_block , m_Permutate.e_array.get() ) ;
-
+/*
     // ----------- XOR2 ------------
 
     ( *mpShift )( mp_block_random.get() + offs_key2 / m_quantum_size ) ;
@@ -452,9 +464,9 @@ void GammaCrypt::Encrypt()
         mcs1 = std::chrono::high_resolution_clock::now() ;
         //
 
-    //auto temp_block = std::make_unique< unsigned char[] >( m_Permutate.m_BIarray.block_size_bytes ) ; // for PMA
-    auto e_temp_block = std::make_unique< unsigned char[] >( m_block_size_bytes ) ; // for ePMA
-    auto e_temp_block_pma = std::make_unique< uint16_t[] >( m_Permutate.epma_size_elms ) ; // for ePMA2
+    assert( m_hrdw_concr != 0 ) ;
+    auto ce_temp_block = std::make_unique< unsigned char[] >( m_block_size_bytes * m_hrdw_concr) ; // for ePMA
+    auto u16e_temp_block_pma = std::make_unique< uint16_t[] >( m_Permutate.epma_size_elms * m_hrdw_concr ) ; // for ePMA2
 
     uint16_t bytes_read ;
     
@@ -544,7 +556,7 @@ void GammaCrypt::Encrypt()
                 // ---------- PMA2, PMA1 ----------
                 eTransformPMA2( m_Permutate.e_array2.get() , m_Permutate.epma_size_elms , op ) ;
                 memcpy( ppma2 + i * m_Permutate.epma_size_elms , m_Permutate.e_array2.get() , m_Permutate.epma_size_elms * sizeof( uint16_t ) ) ;
-                m_Permutate.eRearrangePMA1( e_temp_block_pma.get() , m_Permutate.e_array2.get() ) ;
+                m_Permutate.eRearrangePMA1( u16e_temp_block_pma.get() , m_Permutate.e_array2.get() ) ;
                 memcpy( ppma1 + i * m_Permutate.epma_size_elms , m_Permutate.e_array.get() , m_Permutate.epma_size_elms * sizeof( uint16_t ) ) ;
                 
                 // ----------- KEY2 ------------
@@ -556,9 +568,9 @@ void GammaCrypt::Encrypt()
 
 
         if ( mb_multithread )
-            EncryptBlockMT( e_temp_block_pma.get() , e_temp_block.get() , n_blocks ) ;
+            EncryptBlockMT( u16e_temp_block_pma.get() , ce_temp_block.get() , n_blocks ) ;
         else
-            EncryptBlock( e_temp_block_pma.get() , e_temp_block.get() , op ) ;
+            EncryptBlock( u16e_temp_block_pma.get() , ce_temp_block.get() , op ) ;
         
         // ------------ OUT ------------
 
@@ -670,7 +682,7 @@ void GammaCrypt::Decrypt()
         m_Permutate.eRearrangePMA1( e_temp_block_pma.get() , m_Permutate.e_array2.get() ) ;
         //inverse pma1
         m_Permutate.InverseExpPermutArr( t_invs_pma1.get() , m_Permutate.e_array.get() ) ;
-        m_Permutate.eRearrange( ( unsigned char*) mp_block_source.get() , temp_block.get() , t_invs_pma1.get() ) ;
+        eRearrange( ( unsigned char*) mp_block_source.get() , temp_block.get() , t_invs_pma1.get() , m_Permutate.epma_size_elms , m_block_size_bytes ) ;
 
         #endif // PERMUTATE_ENBLD
         

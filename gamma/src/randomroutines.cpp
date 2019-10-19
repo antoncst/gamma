@@ -437,6 +437,36 @@ void TransformRandomCycle( unsigned * block_random , const size_t n_quantum )
 
 //------------- REPOSITIONING --------------------
 
+
+void eRearrange( unsigned char * p_block , unsigned char * temp_block , uint16_t * p_pm_earr , unsigned epma_size_elms , unsigned block_size_bytes ) noexcept
+{
+
+    memset( temp_block , 0 , block_size_bytes ) ; // todo out away , нельзя убирать, т к биты задаются операцией |=, т е исходный бит д.б. сброшен
+
+    //BitArray res_BA( temp_block ) ;
+
+    for ( uint16_t i = 0 ; i < epma_size_elms ; ++i )
+    {
+        uint16_t byte_offset_src = p_pm_earr[ i ] / 8 ;
+        uint16_t bit_offset_src = p_pm_earr[ i ] % 8 ;
+        
+        uint16_t byte_offset_res = i / 8 ;
+        uint16_t bit_offset_res = i % 8 ;
+        
+        char mask_src = 1 << bit_offset_src ;
+        
+        bool res_bit = p_block[byte_offset_src] & mask_src ;
+        char mask_res = char ( res_bit ) << bit_offset_res ;
+        
+        temp_block[ byte_offset_res ] |= mask_res ;
+        //res_BA.setbit( i , src_BA[ m_array[ i ] ] ) ;
+        //res_BA.setbit( i , src_BA[ m_BIarray[ i ] ] ) ;
+    }
+    memcpy(  p_block , temp_block , block_size_bytes ) ; //todo realize move semantic
+    
+}
+
+
 void Permutate::Init( size_t block_size )
 {
     //Extended (in memory) Permutation Array size, elements
@@ -544,34 +574,6 @@ void Permutate::eRearrangePMA1( uint16_t * temp_block , uint16_t * p_pm_earr ) n
     memcpy( e_array.get() , temp_block , epma_size_elms * sizeof( uint16_t ) ) ;
 }
 
-
-void Permutate::eRearrange( unsigned char * p_block , unsigned char * temp_block , uint16_t * p_pm_earr ) noexcept
-{
-
-    memset( temp_block , 0 , m_BIarray.block_size_bytes ) ; // todo out away , нельзя убирать, т к биты задаются операцией |=, т е исходный бит д.б. сброшен
-
-    //BitArray res_BA( temp_block ) ;
-
-    for ( uint16_t i = 0 ; i < epma_size_elms ; ++i )
-    {
-        uint16_t byte_offset_src = p_pm_earr[ i ] / 8 ;
-        uint16_t bit_offset_src = p_pm_earr[ i ] % 8 ;
-        
-        uint16_t byte_offset_res = i / 8 ;
-        uint16_t bit_offset_res = i % 8 ;
-        
-        char mask_src = 1 << bit_offset_src ;
-        
-        bool res_bit = p_block[byte_offset_src] & mask_src ;
-        char mask_res = char ( res_bit ) << bit_offset_res ;
-        
-        temp_block[ byte_offset_res ] |= mask_res ;
-        //res_BA.setbit( i , src_BA[ m_array[ i ] ] ) ;
-        //res_BA.setbit( i , src_BA[ m_BIarray[ i ] ] ) ;
-    }
-    memcpy(  p_block , temp_block , m_BIarray.block_size_bytes ) ; //todo realize move semantic
-    
-}
 
 // N - epma_size_elms
 void eTransformPMA2( uint16_t * e_array2 , const unsigned N , unsigned & op )

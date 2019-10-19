@@ -69,6 +69,11 @@ public:
 // op - 0..1 ,  operation within eTransformPMA2 , two different algorihms
 void eTransformPMA2( uint16_t * e_array2 , const unsigned N , unsigned & op) ;
 
+// p_block - data to Rearrange
+// temp_block - block for temprorary storing
+// p_pm_earr - PerMutate Extended (in memory) Array , aka PMA
+void eRearrange( unsigned char * p_block , unsigned char * temp_block , uint16_t * p_pm_earr , unsigned epma_size_elms , unsigned block_size_bytes ) noexcept ;
+
 
 class Permutate
 {
@@ -90,7 +95,6 @@ public:
     void InversePermutArr( BitsetItmesArray & bi_arr ) ;
     void InverseExpPermutArr( uint16_t * p_earr, uint16_t * p_pm_earr ) noexcept ; // p_pm_earr  -Pointer to _ PurMutation _ Expanded ARRay
     void Rearrange( unsigned char * p_block , uint16_t bytes_read , unsigned char * temp_block ) noexcept ;
-    void eRearrange( unsigned char * p_block , unsigned char * temp_block , uint16_t * p_pm_earr ) noexcept ;
 
     // rearrange PMA1 via PMA2
     void eRearrangePMA1( uint16_t * temp_block , uint16_t * p_pm_earr ) noexcept ;
