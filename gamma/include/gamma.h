@@ -56,7 +56,7 @@ private:
     bool mb_need_init_blocksize = true ; // for if block_size specified in command line or for decrypt
     bool mb_decrypting = false ;
     bool mb_multithread = false ;
-    static const unsigned m_blks_per_thr = 32 ;
+    static const unsigned m_blks_per_thr = 4096 ;
     
     std::unique_ptr< t_block >   m_upkeys1 , m_upkeys2 ;
     std::unique_ptr< uint16_t[] > m_uppma1 , m_uppma2 ;
@@ -67,6 +67,9 @@ private:
 //    void EncryptBlockOneThr( uint16_t * e_temp_block_pma , unsigned char * e_temp_block , unsigned n_blocks , unsigned Nthr) noexcept ;
             
     void EncryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_temp_block , unsigned & op ) noexcept ;
+
+    void DecryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_temp_block , unsigned & op ) noexcept ;
+
 
     unsigned m_hrdw_concr ;
 
