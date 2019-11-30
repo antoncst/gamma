@@ -22,10 +22,207 @@
 #include "../platform.h"
 
 
-GammaCrypt::GammaCrypt( std::istream & ifs , std::ostream & ofs ,  const std::string & password ) 
-    : m_ifs( ifs ) , m_ofs( ofs ) , m_password( password ) 
-    , mp_block_random( nullptr ) , mp_block_password( nullptr ) , mp_block_source( nullptr ) , mp_block_dest( nullptr )
+std::mutex g_lockprint; // dbg for debug
+
+
+void Threading::thread_proc( int nthr ) 
 {
+	while ( true )
+	{
+		std::shared_lock< std::shared_timed_mutex > locker( m_mutex ) ;
+
+		// проверка прохода:
+		if ( m_pass_processed[ m_n_pass_thr ] )
+		{
+			std::cout << " \n Fatal error m_pass_processed in thread, nItThr: " << mnItTh << "\n" ;
+			return ;
+		}
+		
+		// Выполнение:
+		mpGC->EncryptBlockOneThr( nthr , m_n_pass_thr ) ;
+//#ifndef PERMUTATE_ENBLD
+		//std::this_thread::sleep_for(std::chrono::milliseconds(5)); // todo remove
+//#endif
+
+
+		locker.unlock() ;
+		
+		// дождёмся завершения итерации главного потока:
+		locker.lock() ;
+		while ( ! m_thr_ntfd[ nthr ] )
+			m_notifier.wait( locker ) ;
+		m_thr_ntfd[ nthr ] = false;
+		locker.unlock() ;
+		
+		if ( m_bexit )
+			break ;
+	}
+}
+
+
+void Threading::Process( GammaCrypt * pGC , unsigned Nthr )
+{
+	mpGC = pGC ;
+	m_Nthr = Nthr ;
+	
+	for ( unsigned i = 0 ; i < m_Nthr ; ++i )
+		m_thr_ntfd.push_back( false ) ;
+	
+	m_pass_processed[ 0 ] = true ;
+	m_pass_processed[ 1 ] = true ;
+	m_n_pass_thr =  0 ;
+
+	std::unique_lock< std::shared_timed_mutex > locker( m_mutex ) ;
+	
+    std::vector< std::thread > threads;
+    for( unsigned i = 0; i < m_Nthr ; i++) 
+	{
+        std::thread thr( &Threading::thread_proc, this , i);
+        threads.emplace_back(std::move(thr));
+    }
+
+	unsigned n_pass = 0 ; // номер прохода 0/1
+	
+	// Выполнение: Предварительный рассчёт ключей
+	mpGC->PreCalc( n_pass ) ;
+
+	m_pass_processed[ n_pass ] = false ;
+	n_pass = 1 ;
+
+	mnItTh = 0 ;
+
+	unsigned bytes_to_write = 0 ;
+	
+	// Читаем файл:
+	mpGC->m_ifs.read(  mpGC->mpbuffer , mpGC->mbuf_size ) ;
+	unsigned bytes_read = mpGC->m_ifs.gcount() ;
+	bytes_to_write = bytes_read ;
+	unsigned tail_size_read ;
+	uint64_t bytes_left = mpGC->m_header.source_file_size - mpGC->m_ifs.tellg() ;
+
+   //    main cycle
+    while ( ! mpGC->m_ifs.eof() )
+    {
+
+		// Запуск потоков:
+		locker.unlock() ;
+		// проверка прохода:
+		if ( ! m_pass_processed[ n_pass ] )
+		{
+			display_err( " \n Fatal error m_pass_processed \n" );
+			return ;
+		}
+		m_pass_processed[ n_pass ] = false ;
+		
+//--------------Выполнение:-------------------------------------------------------------------------------
+		
+		if ( bytes_read < mpGC->mbuf_size )
+		{
+			tail_size_read = bytes_read % mpGC->m_block_size_bytes ;
+			bytes_to_write = bytes_read - tail_size_read + mpGC->m_block_size_bytes ;
+
+			if ( tail_size_read != 0 )
+			{
+				//assert( tail_size_read == tail_size_bytes ) ;
+				//mnblocks++ ;
+				// тогда остаток блока надо добить randoms[m_blk_sz_words*2] .. randoms[m_blk_sz_words*2 + tail_size_bytes]
+				memcpy( (char*) params.p_source + tail_size_read, /*reinterpret_cast< unsigned char * >*/ (unsigned char *) ( mpGC->mp_block_random.get() ) + mpGC->offs_ktail , mpGC->m_block_size_bytes - tail_size_read ) ;
+			}
+			
+		}
+        
+        // calculate all key1, key2 , pma1 , pma2
+		mpGC->PreCalc( n_pass ) ;
+
+		// а это уже не сюда:
+        //mpGC->EncryptBlockMT( mce_temp_block  ) ;
+        
+
+//--------------КонецВыполнения---------------------------------------------------------------------------
+		
+		//Дождёмся завершения всех потоков:
+		locker.lock() ;
+
+        // ------------ OUT ------------
+        mpGC->m_ofs.write( (char*) mpGC->mpbuffout , bytes_to_write ) ;
+		
+		// только один поток должен менять эти значения:
+		m_pass_processed[ m_n_pass_thr ] = true ;
+		m_n_pass_thr = ( m_n_pass_thr == 0 ) ? 1 : 0 ;
+		++ mnItTh ;
+		// сбросим счётчик для потоков:
+		//counter = 0 ;
+
+            // Читаем файл: -------- IN --------
+        mpGC->m_ifs.read(  mpGC->mpbuffer , mpGC->mbuf_size ) ;
+        bytes_read = mpGC->m_ifs.gcount() ;
+        bytes_to_write = bytes_read ;
+        bytes_left = mpGC->m_header.source_file_size - mpGC->m_ifs.tellg() ;
+			
+		// оповестим потоки, что готовы выполняться дальше, пусть ждут unlock()
+		for ( unsigned i = 0 ; i < m_Nthr ; ++i )
+			m_thr_ntfd[ i ] = true ;
+		m_notifier.notify_all();
+			
+		n_pass = ( n_pass == 0 )  ? 1 : 0 ;
+		
+		if ( bytes_left < mpGC->mbuf_size )
+		{
+			// Завершаем все потоки, продолжаем однопоточно
+			mpGC->mbuf_size = mpGC->m_block_size_bytes ;
+			mpGC->mb_multithread = false ;
+			break ;
+		}
+
+    } // end of main cycle
+	
+	// Запуск потоков:
+	locker.unlock() ;
+
+	//Дадим возможность потокам запуститься
+	std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+			
+	//Дождёмся завершения всех потоков:
+	locker.lock() ;
+	// только один поток должен менять эти значения:
+	m_pass_processed[ m_n_pass_thr ] = true ;
+	m_n_pass_thr = ( m_n_pass_thr == 0 ) ? 1 : 0 ;
+	++ mnItTh ;
+
+	// оповестим потоки, что готовы выполняться дальше, пусть ждут unlock()
+	for ( unsigned i = 0 ; i < m_Nthr ; ++i )
+		m_thr_ntfd[ i ] = true ;
+	m_notifier.notify_all();
+
+	// Запуск потоков:
+	locker.unlock() ;
+	
+	m_bexit = true ;
+
+	// разморозим потоки:
+	for ( unsigned i = 0 ; i < m_Nthr ; ++i )
+		m_thr_ntfd[ i ] = true ;
+	m_notifier.notify_all();
+		
+    for(auto& thr : threads) 
+	{
+        thr.join();
+    }
+
+    // ------------ OUT ------------
+
+    mpGC->m_ofs.write( (char*) mpGC->mpbuffout , bytes_to_write ) ;
+		
+}
+
+
+GammaCrypt::GammaCrypt( std::istream & ifs , std::ostream & ofs ,  const std::string & password ) 
+    : m_ifs( ifs ) , m_ofs( ofs ) , mp_block_random( nullptr ) ,  m_password( password ) 
+    , mp_block_password( nullptr ) , mp_block_source( nullptr ) , mp_block_dest( nullptr )
+	
+{
+	m_Threading.mpGC = this  ;
 }
 
 void GammaCrypt::Initialize()
@@ -34,11 +231,8 @@ void GammaCrypt::Initialize()
     if ( m_hrdw_concr == 0 )
         m_hrdw_concr = 1 ;
         
-    //m_hrdw_concr = 2 ; // FOR DEBUG!!! REMOVE IT
+    //m_hrdw_concr = 3 ; // FOR DEBUG!!! REMOVE IT
     
-    if ( m_hrdw_concr > 1 && m_header.source_file_size >= m_blks_per_thr * m_block_size_bytes * m_hrdw_concr * 2 ) // todo check(debug) it (near bound)
-        mb_multithread = true ;
-
 /*
     // calculate our 'constants;)'
     if ( file_size > 262143 ) // 256K - 1M
@@ -124,7 +318,7 @@ void GammaCrypt::Initialize()
     if ( m_tail_size_bytes % sizeof( unsigned ) != 0 )
         m_tail_size_words ++ ;
 
-    m_rnd_size_words = m_blk_sz_words * 2 + m_Permutate.m_BIarray.pma_size_bytes * 2 / m_quantum_size + m_tail_size_words ;
+    m_rnd_size_words = m_blk_sz_words * 2 + m_Permutate.m_BIarray.pma_size_bytes * 2 / m_quantum_size + m_blk_sz_words - m_tail_size_words + 1 ;
 
     mp_block_random = std::make_unique< t_block >( m_rnd_size_words ) ; 
 
@@ -135,6 +329,13 @@ void GammaCrypt::Initialize()
     offs_pma1 = m_block_size_bytes * 2 ;
     offs_pma2 = m_block_size_bytes * 2 + m_Permutate.m_BIarray.pma_size_bytes ;
     offs_ktail = m_block_size_bytes * 2 + m_Permutate.m_BIarray.pma_size_bytes * 2 ;
+
+    m_Threading.m_Nthr = 1 ;
+    if ( m_hrdw_concr > 1 && m_header.source_file_size >= m_blks_per_thr * m_block_size_bytes * m_hrdw_concr * 2 ) // todo check(debug) it (near bound)
+    {
+        mb_multithread = true ;
+        m_Threading.m_Nthr = m_hrdw_concr - 1 ; // кол-во фоновых потоков (не считая основного)
+    }
 
 }
 
@@ -303,9 +504,8 @@ void GammaCrypt::DecryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_t
 */
 
 
-void GammaCrypt::EncryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_temp_block , unsigned & op ) noexcept
+void GammaCrypt::EncryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_temp_block ) noexcept
 {
-
 
     // ----------- XOR1 -----------
 
@@ -316,12 +516,12 @@ void GammaCrypt::EncryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_t
     #endif // LFSR_ENBLD
     
     for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-        mp_block_dest[i] = mp_block_source[i] ^ mp_block_random[i] ;
+        params.p_dest[i] = params.p_source[i] ^ mp_block_random[i] ;
         
     #else
     
     for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-        mp_block_dest[i] = mp_block_source[i] ;
+        params.p_dest[i] = params.p_source[i] ;
         
     #endif  // XOR_ENBLD
 
@@ -329,9 +529,9 @@ void GammaCrypt::EncryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_t
 
     #ifdef PERMUTATE_ENBLD
     
-    eTransformPMA2( m_Permutate.e_array2.get() , m_Permutate.epma_size_elms , op ) ;
+    eTransformPMA2( m_Permutate.e_array2.get() , m_Permutate.epma_size_elms , m_op ) ;
     m_Permutate.eRearrangePMA1( e_temp_block_pma , m_Permutate.e_array2.get() ) ;
-    eRearrange( (unsigned char*) mp_block_dest.get() , e_temp_block , m_Permutate.e_array.get() , m_Permutate.epma_size_elms , m_block_size_bytes ) ;
+    eRearrange( (unsigned char*) params.p_dest , e_temp_block , m_Permutate.e_array.get() , m_Permutate.epma_size_elms , m_block_size_bytes ) ;
 
     #endif // PERMUTATE_ENBLD
     
@@ -343,114 +543,131 @@ void GammaCrypt::EncryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_t
     ( *mpShift )( mp_block_random.get() + offs_key2 / m_quantum_size ) ;
     #endif // LFSR_ENBLD
     for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-        mp_block_dest[i] = mp_block_dest[i] ^ mp_block_random[i + offs_key2 / m_quantum_size ] ;
+        params.p_dest[ i ] ^= mp_block_random[ i + offs_key2 / m_quantum_size ] ;
     
     #endif // XOR_ENBLD
 
 }
 
-
-// Nthr - thread number
-void EncryptBlockOneThr( ParamsForCryBl & params , unsigned Nthr ) noexcept
+// nthr - thread number
+void GammaCrypt::EncryptBlockOneThr( unsigned nthr , unsigned n_pass_thr  ) noexcept
 {
 
-    //unsigned op = 0 ;
-    for ( unsigned j = 0 ; j < params.blks_per_thr ; ++ j )
+    for ( unsigned j = 0 ; j < m_blks_per_thr ; ++ j )
     {
         //uidx idx type: unsigneds
-        unsigned uidx = Nthr * params.blks_per_thr * params.blk_sz_words + j * params.blk_sz_words ;
+        unsigned uidx = nthr * m_blks_per_thr * m_blk_sz_words + j * m_blk_sz_words ;
         // ----------- XOR1 -----------
         #ifdef XOR_ENBLD
-        for ( unsigned i = 0 ; i < params.blk_sz_words ; i++ )
+        for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
         {
-            params.p_dest[ uidx + i ] =  params.p_source[ uidx + i ] ^ params.pkeys1[ uidx + i]  ;
+            params.p_dest[ uidx + i ] =  params.p_source[ uidx + i ] ^ mpkeys1[ n_pass_thr * mnblocks * m_blk_sz_words + uidx + i]  ;
         }
+		#else
+            params.p_dest[ uidx + i ] =  params.p_source[ uidx + i ] ;
 		#endif // XOR_ENBLD
         // ---------- REPOSITIONING ----------
 
-        //ну я дурак, eTransformPMA2 уже давно высчитано в ppma2
-        //eTransformPMA2( params.ppma2 + Nthr*params.epma_sz_elmnts , params.epma_sz_elmnts , op ) ;
-        //m_Permutate.eRearrangePMA1( params.e_temp_block_pma + Nthr * params.epma_sz_elmnts  , params.ppma2 + Nthr * params.epma_sz_elmnts ) ;
-
-        //m_Permutate.eRearrange( (unsigned char*) mp_block_dest.get() , e_temp_block , m_Permutate.e_array.get() ) ;
         #ifdef PERMUTATE_ENBLD
         eRearrange( reinterpret_cast< unsigned char * >( params.p_dest + uidx)  
-				, params.e_temp_block + Nthr * params.epma_sz_elmnts
-                , params.ppma1 + Nthr * params.blks_per_thr * params.epma_sz_elmnts + j * params.epma_sz_elmnts 
-                , params.epma_sz_elmnts , params.blk_sz_words * sizeof( unsigned) ) ;
+				, mce_temp_block + nthr * params.epma_sz_elmnts
+                , mppma1 + n_pass_thr * mnblocks * m_Permutate.epma_size_elms + nthr * m_blks_per_thr * params.epma_sz_elmnts + j * params.epma_sz_elmnts 
+                , params.epma_sz_elmnts , m_blk_sz_words * sizeof( unsigned) ) ;
 
-/*			// cout pma
-			std::cout << "\n pma1  thread: " << Nthr << "\n" ;
-			for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
-				std::cout << *(params.ppma1 + Nthr * params.blks_per_thr * params.epma_sz_elmnts + j * params.epma_sz_elmnts)
-					<< ' ' ;
-			std::cout << std::endl << std::endl ;
-*/
+//			// cout pma
+//		{
+//			std::unique_lock<std::mutex> locker(g_lockprint);
+//			m_dbg_ofs2 << "\n pma1  thread: " << nthr << " thr_n_pass: " << n_pass_thr << "\n" ;
+//			for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
+//				m_dbg_ofs2 << *(i + mppma1 + n_pass_thr * mnblocks * m_Permutate.epma_size_elms
+//					         + nthr * m_blks_per_thr * params.epma_sz_elmnts + j * params.epma_sz_elmnts)
+//					<< ' ' ;
+//			m_dbg_ofs2 << std::endl ;
+//		}
+
+
 
 		#endif // PERMUTATE_ENBLD
 
         // ----------- XOR2 -----------
         #ifdef XOR_ENBLD
-        for ( unsigned i = 0 ; i < params.blk_sz_words ; i++ )
+        for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
         {
-            params.p_dest[ uidx + i ] ^=  params.pkeys2[ uidx + i]  ;
+            params.p_dest[ uidx + i ] ^=  mpkeys2[ n_pass_thr * mnblocks * m_blk_sz_words + uidx + i]  ;
         }
 		#endif // XOR_ENBLD
     }
 
-
-        
-/*
-    // ----------- XOR2 ------------
-
-    ( *mpShift )( mp_block_random.get() + offs_key2 / m_quantum_size ) ;
-
-    for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-        mp_block_dest[i] = mp_block_dest[i] ^ mp_block_random[i + offs_key2 / m_quantum_size ] ;
-*/
 }
 
 
 // MT - multithreading
-void GammaCrypt::EncryptBlockMT( uint16_t * e_temp_block_pma , unsigned char * e_temp_block , unsigned n_blocks ) noexcept
+void GammaCrypt::EncryptBlockMT( unsigned char * e_temp_block ) noexcept
 {
-    unsigned n_cycles = n_blocks / m_hrdw_concr ;
+//    unsigned n_cycles = mnblocks / m_hrdw_concr ;
     
-    params.e_temp_block_pma = e_temp_block_pma ;
-    params.e_temp_block = e_temp_block ;
-    params.n_blocks = n_blocks ;
-    params.hardware_concurrency = m_hrdw_concr ;
-    //params.Pmt = m_Permutate ;
-    params.pkeys1 = m_upkeys1.get() ;
-    params.pkeys2 = m_upkeys2.get() ;
-    params.ppma1 = m_uppma1.get() ;
-    params.ppma2 = m_uppma2.get() ;
-    params.blk_sz_words = m_blk_sz_words ;
-    params.blks_per_thr = m_blks_per_thr ;
-    params.e_array = m_Permutate.e_array.get() ;
-    params.e_array2 = m_Permutate.e_array2.get() ;
-    params.epma_sz_elmnts = m_Permutate.epma_size_elms ;
+//    params.e_temp_block = e_temp_block ;
+//    params.e_array = m_Permutate.e_array.get() ;
+//    params.e_array2 = m_Permutate.e_array2.get() ;
+//    params.epma_sz_elmnts = m_Permutate.epma_size_elms ;
     
-    if ( n_cycles )
-    {
-        std::vector<std::thread> threads;
-        for ( unsigned j = 0 ; j < m_hrdw_concr ; ++j )
-        {
-            std::thread thr( EncryptBlockOneThr , std::ref( params ) , j ) ; 
-            threads.emplace_back( std::move( thr ) ) ;
-        }
-        for ( auto & thr : threads ) 
-            thr.join();
-    }
-    else
-    {
-        ;
-    }
+//	EncryptBlockOneThr( params , nthr ) ;
+	
+//    if ( n_cycles )
+//    {
+//        std::vector<std::thread> threads;
+//        for ( unsigned j = 0 ; j < m_hrdw_concr ; ++j )
+//        {
+//            std::thread thr( &GammaCrypt::EncryptBlockOneThr , this , std::ref( params ) , j ) ; 
+//            threads.emplace_back( std::move( thr ) ) ;
+//        }
+//        for ( auto & thr : threads ) 
+//            thr.join();
+//    }
+//    else
+//    {
+//        ;
+//    }
 
 }
 
+void GammaCrypt::PreCalc( unsigned n_pass )
+{
+            for ( unsigned i = 0 ; i < mnblocks ; ++i )
+            {
+                // ----------- KEY1 -----------
+                ( *mpShift )( mp_block_random.get() ) ;
+                //memcpy( m_vkey1[ i ] , mp_block_random.get() , m_block_size_bytes ) ;
+                memcpy( mpkeys1 + n_pass * mnblocks * m_blk_sz_words + i * m_blk_sz_words , mp_block_random.get() , m_block_size_bytes ) ;
+            
+                // ---------- PMA2, PMA1 ----------
+                eTransformPMA2( m_Permutate.e_array2.get() , m_Permutate.epma_size_elms , m_op ) ;
+                memcpy( mppma2 + n_pass * mnblocks * m_Permutate.epma_size_elms + i * m_Permutate.epma_size_elms , m_Permutate.e_array2.get() , m_Permutate.epma_size_elms * sizeof( uint16_t ) ) ;
+                m_Permutate.eRearrangePMA1( mpu16e_temp_block_pma , m_Permutate.e_array2.get() ) ;
+                memcpy( mppma1 + n_pass * mnblocks * m_Permutate.epma_size_elms + i * m_Permutate.epma_size_elms , m_Permutate.e_array.get() , m_Permutate.epma_size_elms * sizeof( uint16_t ) ) ;
+
+//				// cout pma
+//				//m_dbg_ofs1 << "\n pma1 n_pass: " << n_pass << "\n" ;
+//                m_dbg_ofs1 << "\n pma1  _________" << " ____n_pass: " << n_pass << "\n" ;
+//				for ( unsigned j = 0 ; j < m_Permutate.epma_size_elms ; j ++)
+//					m_dbg_ofs1 << *( j + mppma1 + n_pass * mnblocks * m_Permutate.epma_size_elms + i * m_Permutate.epma_size_elms)
+//						<< ' ' ;
+//				m_dbg_ofs1 << std::endl;
+
+                
+                // ----------- KEY2 ------------
+                ( *mpShift )( mp_block_random.get() + offs_key2 / m_quantum_size ) ;
+                memcpy( mpkeys2 + n_pass * mnblocks * m_blk_sz_words + i * m_blk_sz_words , mp_block_random.get() + offs_key2 / m_quantum_size , m_block_size_bytes ) ;
+
+            }
+}
+
+
 void GammaCrypt::Encrypt()  // вот это и будет main_multithread
 {
+	m_dbg_ofs1.open( "out1.txt" ) ;
+	m_dbg_ofs2.open( "out2.txt" ) ;
+
     //calculate size of input file
     //определим размер входного файла
     m_ifs.seekg( 0 , std::ios::end ) ;
@@ -525,57 +742,60 @@ void GammaCrypt::Encrypt()  // вот это и будет main_multithread
     display_str("crypting...") ;
 
     assert( m_hrdw_concr != 0 ) ;
-    auto ce_temp_block = std::make_unique< unsigned char[] >( m_block_size_bytes * m_hrdw_concr) ; // for ePMA
-    auto u16e_temp_block_pma = std::make_unique< uint16_t[] >( m_Permutate.epma_size_elms * m_hrdw_concr ) ; // for ePMA2
+    auto ce_temp_block = std::make_unique< unsigned char[] >( m_block_size_bytes * m_Threading.m_Nthr * 2 ) ; // for ePMA, c-char // * 2 для разных проходов многопоточности todo remove
+	mce_temp_block = ce_temp_block.get() ;
+	
+    auto u16e_temp_block_pma = std::make_unique< uint16_t[] >( m_Permutate.epma_size_elms * m_Threading.m_Nthr ) ; // for ePMA2
+	mpu16e_temp_block_pma = u16e_temp_block_pma.get() ;
 
     unsigned bytes_read ;
     
     // prepair to calculate all key1, key2 , pma1 , pma2
-    unsigned n_blocks = m_hrdw_concr * m_blks_per_thr ;
-    unsigned buf_size = m_block_size_bytes * n_blocks ;
+    mnblocks = m_Threading.m_Nthr * m_blks_per_thr ;
+    mbuf_size = m_block_size_bytes * mnblocks ;
     
-    unsigned * pkeys1 = nullptr , * pkeys2 = nullptr ;
-    uint16_t * ppma1 = nullptr , * ppma2 = nullptr ;
-    
+    std::unique_ptr< t_block > upkeys1 , upkeys2 ;
+    std::unique_ptr< uint16_t[] > uppma1 , uppma2 ;
+
     if ( mb_multithread )
     {
-        m_upkeys1 = std::make_unique< t_block >( n_blocks * m_blk_sz_words ) ;
-        pkeys1 = m_upkeys1.get() ;
+        upkeys1 = std::make_unique< t_block >( mnblocks * m_blk_sz_words * 2 ) ; // * 2 для разных проходов многопоточности
+        mpkeys1 = upkeys1.get() ;
         
-        m_upkeys2 = std::make_unique< t_block >( n_blocks * m_blk_sz_words ) ;
-        pkeys2 = m_upkeys2.get() ;
+        upkeys2 = std::make_unique< t_block >( mnblocks * m_blk_sz_words * 2 ) ;
+        mpkeys2 = upkeys2.get() ;
         
-        m_uppma1 = std::make_unique< uint16_t[] >( n_blocks * m_Permutate.epma_size_elms ) ;
-        ppma1 = m_uppma1.get() ;
+        uppma1 = std::make_unique< uint16_t[] >( mnblocks * m_Permutate.epma_size_elms * 2 ) ;
+        mppma1 = uppma1.get() ;
         
-        m_uppma2 = std::make_unique< uint16_t[] >( n_blocks * m_Permutate.epma_size_elms ) ;
-        ppma2 = m_uppma2.get() ;
+        uppma2 = std::make_unique< uint16_t[] >( mnblocks * m_Permutate.epma_size_elms * 2 ) ;
+        mppma2 = uppma2.get() ;
         
     }
 
    
     std::unique_ptr< char[] > upbuffer ; // up - Unique Ptr
-    char * pbuffer ;
 
     std::unique_ptr< char[] > upbuffout ; // up - Unique Ptr
-    char * pbuffout ;
     
     if ( ! mb_multithread )
     {
-        pbuffer = reinterpret_cast< char * > ( mp_block_source.get() ) ;
-        pbuffout = reinterpret_cast< char * > ( mp_block_dest.get() ) ;
-        buf_size = m_block_size_bytes ;
+        mpbuffer = reinterpret_cast< char * > ( mp_block_source.get() ) ;
+        mpbuffout = reinterpret_cast< char * > ( mp_block_dest.get() ) ;
+        mbuf_size = m_block_size_bytes ;
+		params.p_source = mp_block_source.get() ;
+		params.p_dest = mp_block_dest.get() ;
     }
     else
     {
-        upbuffer = std::make_unique< char[] >( buf_size ) ;
-        pbuffer = upbuffer.get() ;
+        upbuffer = std::make_unique< char[] >( mbuf_size ) ;
+        mpbuffer = upbuffer.get() ;
 
-        upbuffout = std::make_unique< char[] >( buf_size ) ;
-        pbuffout = upbuffout.get() ;
+        upbuffout = std::make_unique< char[] >( mbuf_size ) ;
+        mpbuffout = upbuffout.get() ;
         
-        params.p_source = reinterpret_cast< unsigned * >( pbuffer ) ;
-        params.p_dest = reinterpret_cast< unsigned * >( pbuffout ) ;
+        params.p_source = reinterpret_cast< unsigned * >( mpbuffer ) ;
+        params.p_dest = reinterpret_cast< unsigned * >( mpbuffout ) ;
     }
 
         // time mesaure
@@ -583,90 +803,58 @@ void GammaCrypt::Encrypt()  // вот это и будет main_multithread
         //
 
     // operation for eTransformPMA2
-    unsigned op = 0 ;
+    m_op = 0 ;
     
+    mnblocks = mbuf_size / m_block_size_bytes ;
+	
+    params.e_array = m_Permutate.e_array.get() ;
+    params.e_array2 = m_Permutate.e_array2.get() ;
+    params.epma_sz_elmnts = m_Permutate.epma_size_elms ;
+
     // GO!
+	if ( mb_multithread )
+	{
+		m_Threading.Process( this , m_Threading.m_Nthr ) ;
+	}
+	//даже если был multithread, заканчиваем однопоточно:
     while ( ! m_ifs.eof() )
     {
         
-        m_ifs.read(  pbuffer , buf_size ) ;
+        m_ifs.read(  mpbuffer , mbuf_size ) ;
         bytes_read = m_ifs.gcount() ;
+		unsigned bytes_to_write = bytes_read ;
+		unsigned tail_size_read ;
+		
+		//uint64_t bytes_left = m_header.source_file_size - m_ifs.tellg() ;
+		
+		if ( bytes_read < mbuf_size )
+		{
+			tail_size_read = bytes_read % m_block_size_bytes ;
+			bytes_to_write = bytes_read - tail_size_read + m_block_size_bytes ;
+
+			if ( tail_size_read != 0 )
+			{
+				assert( tail_size_read == tail_size_bytes ) ;
+				//mnblocks++ ;
+				// тогда остаток блока надо добить randoms[m_blk_sz_words*2] .. randoms[m_blk_sz_words*2 + tail_size_bytes]
+				memcpy( (char*) params.p_source + tail_size_read, /*reinterpret_cast< unsigned char * >*/ (unsigned char *) ( mp_block_random.get() ) + offs_ktail , m_block_size_bytes - tail_size_read ) ;
+			}
+			
+		}
         
-        n_blocks = bytes_read / m_block_size_bytes ;
-        unsigned tail_size_read = bytes_read % m_block_size_bytes ;
-
-        if ( tail_size_read != 0 )
-        {
-            assert( tail_size_read == tail_size_bytes ) ;
-            n_blocks++ ;
-            // тогда остаток блока надо добить randoms[m_blk_sz_words*2] .. randoms[m_blk_sz_words*2 + tail_size_bytes]
-            memcpy( (char*) mp_block_source.get() + tail_size_read, /*reinterpret_cast< unsigned char * >*/ (unsigned char *) ( mp_block_random.get() ) + offs_ktail , m_block_size_bytes - tail_size_read ) ;
-        }
-        
-        // calculate all key1, key2 , pma1 , pma2
-        if ( mb_multithread )
-        {
-            for ( unsigned i = 0 ; i < n_blocks ; ++i )
-            {
-                // ----------- KEY1 -----------
-                ( *mpShift )( mp_block_random.get() ) ;
-                //memcpy( m_vkey1[ i ] , mp_block_random.get() , m_block_size_bytes ) ;
-                memcpy( pkeys1 + i * m_blk_sz_words , mp_block_random.get() , m_block_size_bytes ) ;
-            
-                // ---------- PMA2, PMA1 ----------
-                eTransformPMA2( m_Permutate.e_array2.get() , m_Permutate.epma_size_elms , op ) ;
-                memcpy( ppma2 + i * m_Permutate.epma_size_elms , m_Permutate.e_array2.get() , m_Permutate.epma_size_elms * sizeof( uint16_t ) ) ;
-                m_Permutate.eRearrangePMA1( u16e_temp_block_pma.get() , m_Permutate.e_array2.get() ) ;
-                memcpy( ppma1 + i * m_Permutate.epma_size_elms , m_Permutate.e_array.get() , m_Permutate.epma_size_elms * sizeof( uint16_t ) ) ;
-
-/*					// cout pma
-					std::cout << "\n pma1 \n " ;
-					for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
-						std::cout << m_Permutate.e_array[ i ] << ' ' ;
-					std::cout << std::endl << std::endl ;
-*/
-                
-                // ----------- KEY2 ------------
-                ( *mpShift )( mp_block_random.get() + offs_key2 / m_quantum_size ) ;
-                memcpy( pkeys2 + i * m_blk_sz_words , mp_block_random.get() + offs_key2 / m_quantum_size , m_block_size_bytes ) ;
-
-            }
-        }
-
-
-        if ( mb_multithread )
-            EncryptBlockMT( u16e_temp_block_pma.get() , ce_temp_block.get() , n_blocks ) ;
-        else
-            EncryptBlock( u16e_temp_block_pma.get() , ce_temp_block.get() , op ) ;
+		EncryptBlock( mpu16e_temp_block_pma , mce_temp_block ) ;
         
         // ------------ OUT ------------
 
-        m_ofs.write( (char*) pbuffout , buf_size ) ;
-
-/*        // for debugging
-        memcpy (&v[n] , m_block_dest , 32 ) ;
-        for ( size_t i = 0 ; i <n  ; i++ )
-        {
-            if ( memcmp( &v[i] , m_block_dest , 32) == 0 )
-            {
-                std::cout << "found:" << n ;
-                b_found = true ;
-                break ;
-            }
-        }
-        if (b_found)
-            break ;
-        n++;
-*/
-
-
-    }
+        m_ofs.write( (char*) mpbuffout , bytes_to_write ) ;
+		
+    } // end of main cycle
     
         // time mesaure
         mcs2 = std::chrono::high_resolution_clock::now() ;
         mcs = mcs2 - mcs1 ;
         drtn = mcs.count() * 1'000'000 ;
-        std::cout << "Duration: " << drtn << std::endl ;
+        std::cout << "Speed: " << float(m_header.source_file_size) / 1024 / 1024 / drtn * 1'000'000 << " MB/sec" << std::endl ;
         //
     
 }
@@ -793,7 +981,7 @@ void GammaCrypt::Decrypt()
             auto mcs2 = std::chrono::high_resolution_clock::now() ;
             std::chrono::duration<double> mcs = mcs2 - mcs1 ;
             uint64_t drtn = mcs.count() * 1000000 ;
-            std::cout << "Duration: " << drtn << std::endl ;
+            std::cout << "Speed: " << float(m_header.source_file_size) / 1024 / 1024 / drtn * 1'000'000 << " MB/sec" << std::endl ;
             //
 }
 
@@ -845,12 +1033,13 @@ void GammaCrypt::Decrypt()
             auto mcs1 = std::chrono::high_resolution_clock::now() ;
             //
 
-    auto ce_temp_block = std::make_unique< unsigned char[] >( m_block_size_bytes * m_hrdw_concr) ; // for ePMA
-    auto u16e_temp_block_pma = std::make_unique< uint16_t[] >( m_Permutate.epma_size_elms * m_hrdw_concr ) ; // for ePMA2
+    auto ce_temp_block = std::make_unique< unsigned char[] >( m_block_size_bytes * m_Threading.m_Nthr) ; // for ePMA
+	mce_temp_block = ce_temp_block.get() ;
+    auto u16e_temp_block_pma = std::make_unique< uint16_t[] >( m_Permutate.epma_size_elms * m_Threading.m_Nthr ) ; // for ePMA2
 
     // prepair to calculate all key1, key2 , pma1 , pma2
-    unsigned n_blocks = m_hrdw_concr * m_blks_per_thr ;
-    unsigned buf_size = m_block_size_bytes * n_blocks ;
+    unsigned n_blocks = m_Threading.m_Nthr * m_blks_per_thr ;
+    mbuf_size = m_block_size_bytes * n_blocks ;
     
     unsigned * pkeys1 = nullptr , * pkeys2 = nullptr ;
     uint16_t * ppma1 = nullptr , * ppma2 = nullptr ;
@@ -873,27 +1062,26 @@ void GammaCrypt::Decrypt()
 
    
     std::unique_ptr< char[] > upbuffer ; // up - Unique Ptr
-    char * pbuffer ;
 
     std::unique_ptr< char[] > upbuffout ; // up - Unique Ptr
-    char * pbuffout ;
+    char * mpbuffout ;
     
     if ( ! mb_multithread )
     {
-        pbuffer = reinterpret_cast< char * > ( mp_block_source.get() ) ;
-        pbuffout = reinterpret_cast< char * > ( mp_block_dest.get() ) ;
-        buf_size = m_block_size_bytes ;
+        mpbuffer = reinterpret_cast< char * > ( mp_block_source.get() ) ;
+        mpbuffout = reinterpret_cast< char * > ( mp_block_dest.get() ) ;
+        mbuf_size = m_block_size_bytes ;
     }
     else
     {
-        upbuffer = std::make_unique< char[] >( buf_size ) ;
-        pbuffer = upbuffer.get() ;
+        upbuffer = std::make_unique< char[] >( mbuf_size ) ;
+        mpbuffer = upbuffer.get() ;
 
-        upbuffout = std::make_unique< char[] >( buf_size ) ;
-        pbuffout = upbuffout.get() ;
+        upbuffout = std::make_unique< char[] >( mbuf_size ) ;
+        mpbuffout = upbuffout.get() ;
         
-        params.p_source = reinterpret_cast< unsigned * >( pbuffer ) ;
-        params.p_dest = reinterpret_cast< unsigned * >( pbuffout ) ;
+        params.p_source = reinterpret_cast< unsigned * >( mpbuffer ) ;
+        params.p_dest = reinterpret_cast< unsigned * >( mpbuffout ) ;
     }
 
 
@@ -904,7 +1092,7 @@ void GammaCrypt::Decrypt()
     while ( i > 0 )
     {
         // READING
-        m_ifs.read(  pbuffer , buf_size ) ;
+        m_ifs.read(  mpbuffer , mbuf_size ) ;
         unsigned bytes_read = m_ifs.gcount() ;
         if ( bytes_read == 0 )
             break ;
@@ -937,7 +1125,7 @@ void GammaCrypt::Decrypt()
 
 
         if ( mb_multithread )
-            EncryptBlockMT( u16e_temp_block_pma.get() , ce_temp_block.get() , n_blocks ) ;
+            EncryptBlockMT( u16e_temp_block_pma.get() , mce_temp_block , n_blocks ) ;
         else
             EncryptBlock( u16e_temp_block_pma.get() , ce_temp_block.get() , op ) ;
         
@@ -955,7 +1143,7 @@ void GammaCrypt::Decrypt()
 
         //OUT
         //m_ofs.write( (char*) mp_block_dest.get() , bytes_to_write ) ;
-        m_ofs.write( (char*) pbuffout , buf_size ) ;
+        m_ofs.write( (char*) mpbuffout , mbuf_size ) ;
 
     }
             // time mesaure

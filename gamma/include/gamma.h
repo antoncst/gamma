@@ -9,24 +9,30 @@
 #include <cstring>
 #include <memory>
 
+#include <condition_variable>
+#include <thread>
+#include <mutex>
+#include <shared_mutex>
+#include <atomic>
+
 
 // Parameters for CryptBlock
 struct ParamsForCryBl
 {
     ParamsForCryBl() {} ;
-    uint16_t * e_temp_block_pma ;
-    unsigned char * e_temp_block ;
-    unsigned hardware_concurrency ;
-    unsigned n_blocks ;
+    //uint16_t * e_temp_block_pma ;
+    //unsigned char * e_temp_block ;
+    //unsigned hardware_concurrency ;
+    //unsigned n_blocks ;
     unsigned * p_source ;
     unsigned * p_dest ;
     //unsigned offset ; // in p_block_source and p_block_dest
 
-    unsigned * pkeys1 , * pkeys2 ;
-    uint16_t * ppma1 , * ppma2 ;
+    //unsigned * pkeys1 , * pkeys2 ;
+    //uint16_t * ppma1 , * ppma2 ;
 
-    unsigned blk_sz_words ;
-    unsigned blks_per_thr ;
+    //unsigned blk_sz_words ;
+    //unsigned blks_per_thr ;
     uint16_t * e_array ;
     uint16_t * e_array2 ;
     unsigned epma_sz_elmnts ;
@@ -34,41 +40,105 @@ struct ParamsForCryBl
 
 static ParamsForCryBl params ;
 
+class GammaCrypt ;
+
+class Threading
+{
+public:
+	void Process( GammaCrypt * GC , unsigned Nthr ) ;
+	GammaCrypt * mpGC ; 
+	unsigned m_Nthr = 0 ;
+private:
+	std::shared_timed_mutex m_mutex ;
+	std::condition_variable_any m_notifier ;
+	std::vector< bool > m_thr_ntfd ; //std::atomic_bool
+	unsigned m_n_pass_thr ; //std::atomic_uint
+	unsigned mnItTh ;
+	bool m_pass_processed[ 2 ] ; //std::atomic_bool
+	bool m_bexit = false ;
+
+	void thread_proc( int nthr ) ;
+} ;
+
 
 class GammaCrypt
 {
 public:
     GammaCrypt( std::istream & ifs , std::ostream & ofs , const std::string & password ) ;
 
+	std::ofstream m_dbg_ofs1 ;
+	std::ofstream m_dbg_ofs2 ;
+
     void Encrypt() ;
     void Decrypt() ;
+	
+	// Предварительные рассчёты keys, pma's
+	void PreCalc( unsigned n_pass ) ;
     
     void SetBlockSize( unsigned block_size ) ;
     void mGenerateRandoms() ;
     void MakePswBlock() ;
     
+    std::istream & m_ifs ;
+    std::ostream & m_ofs ;
+    
+    char * mpbuffer ;
+    char * mpbuffout ;
+	unsigned mbuf_size ;
+    // MT- multithread
+    void EncryptBlockMT( unsigned char * e_temp_block ) noexcept ;
+
+	void EncryptBlockOneThr( unsigned Nthr , unsigned n_pass_thr ) noexcept ;
+
     unsigned m_rnd_size_words ; // word - sizeof( unsigned )
     unsigned m_tail_size_words ;
     unsigned m_tail_size_bytes ;
-    
-private:    
+
+	unsigned char * mce_temp_block ;
+	
+    struct t_header
+    {
+        // 0x00
+        uint8_t major_ver = 0x00 ;
+        uint8_t minor_ver = 0x00 ;
+        // 0x02
+        uint16_t data_offset ;  // начало блока ключа.
+                                // относительно начала файла (заголовка) , то есть размер заголовка
+        // 0x04
+        uint16_t h_block_size ; // размер блока (ключа и пр.). h_ (header) - чтобы не путаться с другими "block_size"
+        uint16_t reserved = 0 ;
+        // 0x08
+        uint64_t source_file_size ; // размер исходного файла
+    } m_header ; 
+
     size_t m_block_size_bytes = 64 ;    // in bytes , further calculated in Initialize method, deponds on file size
+    bool mb_multithread = false ;
+
+    // block random
+    // N = m_blk_sz_words / 4 
+    // offset in bytes:
+    //    KEY1           KEY2                PMA1                             PMA2                         tail KEY
+    // 0  ... N-1   N  ...  N*2-1   N*2...N*2+PMAsizeBytes-1   N*2+PMAsizeBytes...N*2+PMAsizeBytes*2-1    N*2+PMAsizeBytes*2 ... N*2+PMAsizeBytes*2+tailSize-1
+    std::unique_ptr< t_block > mp_block_random ; // mp_...   m - member, p - pointer
+    //obsolete: std::unique_ptr< t_block > mp_block_random3 ;
+    
+
+private:    
     bool mb_need_init_blocksize = true ; // for if block_size specified in command line or for decrypt
     bool mb_decrypting = false ;
-    bool mb_multithread = false ;
-    static const unsigned m_blks_per_thr = 4096 ;
+    static const unsigned m_blks_per_thr = 8192 ;
     
-    std::unique_ptr< t_block >   m_upkeys1 , m_upkeys2 ;
-    std::unique_ptr< uint16_t[] > m_uppma1 , m_uppma2 ;
-
-    // MT- multithread
-    void EncryptBlockMT( uint16_t * e_temp_block_pma , unsigned char * e_temp_block , unsigned n_blocks ) noexcept ;
-
-//    void EncryptBlockOneThr( uint16_t * e_temp_block_pma , unsigned char * e_temp_block , unsigned n_blocks , unsigned Nthr) noexcept ;
+    unsigned * mpkeys1 = nullptr , * mpkeys2 = nullptr ; // m-member, p-pointer
+    uint16_t * mppma1 = nullptr , * mppma2 = nullptr ; // m-member, p-pointer
+	uint16_t * mpu16e_temp_block_pma ; // m-member, p-pointer to u16-uint16_t, e - expanded
+	unsigned mnblocks ; // number of blocks
+	unsigned m_op ; // operation for TransformPMA2
+	
+	Threading m_Threading ;
             
-    void EncryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_temp_block , unsigned & op ) noexcept ;
+    void EncryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_temp_block  ) noexcept ;
 
-    void DecryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_temp_block , unsigned & op ) noexcept ;
+    void DecryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_temp_block  ) noexcept ;
 
 
     unsigned m_hrdw_concr ;
@@ -92,26 +162,15 @@ private:
     // called from Encrypt(), Decrypt()
     void Crypt() ;
     
-    std::istream & m_ifs ;
-    std::ostream & m_ofs ;
-    
     const std::string & m_password ;
-    
-    // block random
-    // N = m_blk_sz_words / 4 
-    // offset in bytes:
-    //    KEY1           KEY2                PMA1                             PMA2                         tail KEY
-    // 0  ... N-1   N  ...  N*2-1   N*2...N*2+PMAsizeBytes-1   N*2+PMAsizeBytes...N*2+PMAsizeBytes*2-1    N*2+PMAsizeBytes*2 ... N*2+PMAsizeBytes*2+tailSize-1
-    std::unique_ptr< t_block > mp_block_random ; // mp_...   m - member, p - pointer
-    //obsolete: std::unique_ptr< t_block > mp_block_random3 ;
     
     //offsets bytes:
     unsigned offs_key2 ;
     unsigned offs_pma1 ;
     unsigned offs_pma2 ;
+public:
     unsigned offs_ktail ;
-    
-
+private:
 
     std::unique_ptr< t_block > mp_block_password ;
     std::unique_ptr< unsigned char[] > mpc_block_psw_pma ; // c - char
@@ -127,20 +186,7 @@ private:
     // Pointer to LFSR function
     void ( * mpShift )( unsigned * p_block ) ;
     
-    struct t_header
-    {
-        // 0x00
-        uint8_t major_ver = 0x00 ;
-        uint8_t minor_ver = 0x00 ;
-        // 0x02
-        uint16_t data_offset ;  // начало блока ключа.
-                                // относительно начала файла (заголовка) , то есть размер заголовка
-        // 0x04
-        uint16_t h_block_size ; // размер блока (ключа и пр.). h_ (header) - чтобы не путаться с другими "block_size"
-        uint16_t reserved = 0 ;
-        // 0x08
-        uint64_t source_file_size ; // размер исходного файла
-    } m_header ; 
 } ;
+
 
 #endif // GAMMA_H_INCLUDED
