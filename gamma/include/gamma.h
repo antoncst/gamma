@@ -66,8 +66,8 @@ class GammaCrypt
 public:
     GammaCrypt( std::istream & ifs , std::ostream & ofs , const std::string & password ) ;
 
-	std::ofstream m_dbg_ofs1 ;
-	std::ofstream m_dbg_ofs2 ;
+	//std::ofstream m_dbg_ofs1 ;
+	//std::ofstream m_dbg_ofs2 ;
 
     void Encrypt() ;
     void Decrypt() ;
@@ -131,7 +131,7 @@ private:
     unsigned * mpkeys1 = nullptr , * mpkeys2 = nullptr ; // m-member, p-pointer
     uint16_t * mppma1 = nullptr , * mppma2 = nullptr ; // m-member, p-pointer
 	uint16_t * mpu16e_temp_block_pma ; // m-member, p-pointer to u16-uint16_t, e - expanded
-	unsigned mnblocks ; // number of blocks
+	unsigned mNblocks ; // number of blocks
 	unsigned m_op ; // operation for TransformPMA2
 	
 	Threading m_Threading ;
