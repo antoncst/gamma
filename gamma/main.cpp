@@ -28,7 +28,7 @@ int main(int argc, char **argv)
 
     try
     {
-        OpenFiles( in_filename , out_filename , ifs , ofs ) ;
+        OpenInFile( in_filename , ifs ) ;
     }
     catch ( const char * s )
     {
@@ -43,6 +43,17 @@ int main(int argc, char **argv)
     if ( ! EnterPassword( password , parser.psw_input_twice ) )
         return 2 ;
     
+    try
+    {
+        OpenOutFile( out_filename , ofs ) ;
+    }
+    catch ( const char * s )
+    {
+        display_err( s ) ;
+        return 4 ;
+    }
+    
+
     assert( ifs.is_open() ) ;
     assert( ofs.is_open() ) ;
 

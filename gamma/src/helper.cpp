@@ -75,8 +75,7 @@ bool EnterPassword( string & password , bool twice )
 // OpenFile
 // in:  string in_filename, string out_filename
 // out: ifstream & ifs, ofstream & ofs
-void OpenFiles(const std::string in_filename, const std::string out_filename /* input and output files */
-                , ifstream & ifs , ofstream & ofs )
+void OpenInFile(const std::string in_filename , std::ifstream & ifs )
 {
     ifs.open( in_filename.c_str() , ifstream::in | ifstream::binary ) ;
     if ( ! ifs.is_open() )
@@ -84,12 +83,14 @@ void OpenFiles(const std::string in_filename, const std::string out_filename /* 
         display_str( help_string ) ;
         throw( " Error opening input file for reading" ) ;
     }
+}
 
-    ofs.open( out_filename.c_str(), ifstream::out | ifstream::binary | ifstream::trunc ) ;
+void OpenOutFile( const std::string out_filename , std::ofstream & ofs )
+{
+    ofs.open( out_filename.c_str(), ofstream::out | ofstream::binary | ofstream::trunc ) ;
 
     if ( ! ofs.is_open() )
         throw( " Error opening output file for writing" ) ;
-
 }
 
 

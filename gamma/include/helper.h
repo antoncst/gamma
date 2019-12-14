@@ -6,8 +6,9 @@
 bool EnterPassword( std::string & password , bool twice ) ;
 
 
-void OpenFiles(const std::string in_filename, const std::string out_filename /* input and output files */
-                , std::ifstream & ifs , std::ofstream & ofs ) ;
+void OpenInFile(const std::string in_filename , std::ifstream & ifs ) ;
+
+void OpenOutFile( const std::string out_filename , std::ofstream & ofs ) ;
 
 
 class CmdLnParser
