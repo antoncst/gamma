@@ -13,63 +13,70 @@ int main(int argc, char **argv)
 {
     //std::ios::sync_with_stdio(false);
     
-    std::ifstream ifs ;
-    std::ofstream ofs ;
+    std::ifstream ifs ; 
+    std::ifstream ifs_keyfile ;
+    std::ofstream ofs ; // when generating keyfile , using this stream for keyfile
 
-    std::string in_filename;
-    std::string out_filename ;
-
-    CmdLnParser parser( in_filename , out_filename ) ;
+    CmdLnParser parser ;
     parser.ParseCommandLine( argc , argv ) ;
     if  (parser.m_b_error )
         return 1;
     
-	//bool psw_input_twice ;
-
-    try
+    // open in file
+    if ( parser.action != parser.genkey )
     {
-        OpenInFile( in_filename , ifs ) ;
+        try
+        {
+            OpenInFile( parser.m_in_filename , ifs ) ;
+        }
+        catch ( const char * s )
+        {
+            display_err( s ) ;
+            return 3 ;
+        }
     }
-    catch ( const char * s )
-    {
-        display_err( s ) ;
-        return 3 ;
-    }
-    
     
     std::string password ;
     password = "1234567890AB" ;
     
+    GammaCrypt gm( ifs , ofs , password ) ;
+    
+    gm.m_keyfilename = "keyfile" ;
+    gm.mb_use_keyfile = parser.mb_use_keyfile ;
+
+    
     if ( ! EnterPassword( password , parser.psw_input_twice ) )
         return 2 ;
     
+    // open out file
     try
     {
-        OpenOutFile( out_filename , ofs ) ;
+        if ( parser.action != parser.genkey )
+            OpenOutFile( parser.m_out_filename , ofs ) ;
+        else // genkey
+            OpenOutFile( gm.m_keyfilename , ofs ) ;
     }
     catch ( const char * s )
     {
         display_err( s ) ;
         return 4 ;
     }
-    
 
-    assert( ifs.is_open() ) ;
-    assert( ofs.is_open() ) ;
 
-    GammaCrypt gm( ifs , ofs , password ) ;
-    
     try 
     {
-        if ( parser.action == parser.none || parser.action == parser.encrypt )
+        if ( parser.action == parser.none || parser.action == parser.encrypt || parser.action == parser.genkey )
         {
             if ( parser.mb_blocksize_specified )
                 gm.SetBlockSize( parser.m_block_size ) ;
 
-            gm.Encrypt() ;
+            if ( parser.action == parser.none || parser.action == parser.encrypt )
+                gm.Encrypt() ;
+            else
+                gm.GenKeyToFile() ;
         }
-        else
-            gm.Decrypt() ;
+            else
+                gm.Decrypt() ;
     }
     catch( const char * s) 
     {

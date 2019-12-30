@@ -8,6 +8,7 @@
 #include <iostream>
 #include <cstring>
 #include <memory>
+#include <fstream>
 
 #include <condition_variable>
 #include <thread>
@@ -71,8 +72,9 @@ public:
 
     void Encrypt() ;
     void Decrypt() ;
+    void GenKeyToFile() ;
 	
-	// Предварительные рассчёты keys, pma's
+	// Предварительные расчёты keys, pma's
 	void PreCalc( unsigned n_pass ) ;
     
     void SetBlockSize( unsigned block_size ) ;
@@ -80,6 +82,7 @@ public:
     void MakePswBlock() ;
     
     std::istream & m_ifs ;
+    std::fstream m_ifs_keyfile ;
     std::ostream & m_ofs ;
     
     char * mpbuffer ;
@@ -99,6 +102,8 @@ public:
     struct t_header
     {
         // 0x00
+        // bit7 (high bit) == 0 - file contains keys (and pma's)
+        // bit7 (high bit) == 1 - keys are in the keyfile
         uint8_t major_ver = 0x00 ;
         uint8_t minor_ver = 0x00 ;
         // 0x02
@@ -113,6 +118,7 @@ public:
 
     size_t m_block_size_bytes = 64 ;    // in bytes , further calculated in Initialize method, deponds on file size
     bool mb_multithread = false ;
+    bool mb_use_keyfile = false ;
 
     // block random
     // N = m_blk_sz_words / 4 
@@ -152,10 +158,10 @@ private:
     //write header into output file (i.e. Key) 
     void WriteHead() ;
     //read header from input file
-    void ReadHead() ;
+    void ReadHead( std::istream & ifs ) ;
     
     //read keys, pma etc.
-    void ReadOverheadData() ;
+    void ReadOverheadData( std::istream & ifs ) ;
 
     //obsolete:
     // actually crypt algorythm
@@ -170,6 +176,7 @@ private:
     unsigned offs_pma2 ;
 public:
     unsigned offs_ktail ;
+    std::string m_keyfilename ;
 private:
 
     std::unique_ptr< t_block > mp_block_password ;

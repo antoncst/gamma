@@ -13,12 +13,13 @@ void OpenOutFile( const std::string out_filename , std::ofstream & ofs ) ;
 
 class CmdLnParser
 {
-    std::string & m_in_filename ;
-    std::string & m_out_filename ;
 
 public:
+    std::string m_in_filename ;
+    std::string m_out_filename ;
+    std::string m_keyfilename ;
 
-    CmdLnParser( std::string & in_filename , std::string & out_filename ) ;
+    CmdLnParser() ;
     void ParseCommandLine( int argc , char **argv ) ;
 
    	bool psw_input_twice ;
@@ -26,12 +27,14 @@ public:
 
     enum e_action
     {
-        none,
-        encrypt,
-        decrypt
+        none ,
+        encrypt ,
+        decrypt ,
+        genkey
     } action ;
     
-    bool mb_blocksize_specified ;
+    bool mb_blocksize_specified = false ;
+    bool mb_use_keyfile = false ;
     unsigned m_block_size ;
 
 /*    int password ; // 0 - password is not specified
@@ -46,12 +49,14 @@ static const std::string help_string  =
     "commands:\n"
     "-e --encrypt [source_file] [encrypted_file]\n"
     "-d --decrypt [encrypted_file] [source_file]\n"
+    "-gk --genkey    generate keys to keyfile\n"
     "\n"
     "default command is --encrypt\n"
     "default source_file is 'source'\n"
     "default encrypted_file is 'encrypted'\n"
     "\n"
     "-s N  :  block size. N should be a power of 2.\n"
+    "-k --keyfile :  use keyfile instead of generating keys.\n"
     "\n"
     "Examples:\n"
     "gamma   \n"

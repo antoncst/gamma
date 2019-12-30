@@ -95,9 +95,10 @@ void OpenOutFile( const std::string out_filename , std::ofstream & ofs )
 
 
 
-CmdLnParser::CmdLnParser( std::string & in_filename , std::string & out_filename )
-    : m_in_filename( in_filename) , m_out_filename( out_filename ) 
-    {} ;
+CmdLnParser::CmdLnParser()
+{
+    ;
+} 
 
 void CmdLnParser::ParseCommandLine( int argc , char **argv )
 {
@@ -127,6 +128,11 @@ void CmdLnParser::ParseCommandLine( int argc , char **argv )
                         action = decrypt ;
                     else
                         { m_b_error = true ; break ; } 
+                else if ( s == "-gk" || s == "--genkey" )
+                    if ( action == none )
+                        action = genkey ;
+                    else
+                        { m_b_error = true ; break ; } 
                 else if ( s == "-s" || s == "--size" )
                     if ( i + 1 < argc  )
                     {
@@ -136,6 +142,10 @@ void CmdLnParser::ParseCommandLine( int argc , char **argv )
                     }
                     else
                         { m_b_error = true ; break ; } 
+                else if ( s == "-k" || s == "--keyfile" )
+                    {
+                        mb_use_keyfile = true ;
+                    }
                 else if ( s == "-h" || s == "--help" )
                     { m_b_error = true ; break ; } 
                 else
@@ -162,6 +172,13 @@ void CmdLnParser::ParseCommandLine( int argc , char **argv )
             }
         }
     }
+    
+    if ( mb_use_keyfile && mb_blocksize_specified && ( action == encrypt || action == decrypt ) )
+    {
+        m_b_error = true ;
+        display_err( "key file cannot be used with block size specified" ) ;
+    }
+        
     if ( m_b_error )
     {
         display_str( help_string ) ;
