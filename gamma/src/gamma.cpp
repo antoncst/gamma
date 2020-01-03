@@ -231,23 +231,33 @@ void GammaCrypt::Initialize()
     m_hrdw_concr = std::thread::hardware_concurrency() ;
     if ( m_hrdw_concr == 0 )
         m_hrdw_concr = 1 ;
-        
-    //m_hrdw_concr = 4 ; // todo FOR DEBUG!!! REMOVE IT
+//    else if ( m_hrdw_concr > 3 )
+//        m_hrdw_concr = 3 ;
+    
+    //m_hrdw_concr = 1 ; // todo FOR DEBUG!!! REMOVE IT
     
     // calculate our 'constants'
     
+//    if ( mb_need_init_blocksize )
+//    {
+//        if ( m_header.source_file_size >= 131072 )     // 128K -
+//            m_block_size_bytes = 128 ;
+//        else if ( m_header.source_file_size >= 65536 ) // 64K - 128K
+//            m_block_size_bytes = 64 ;
+//        else if ( m_header.source_file_size >= 16384 ) // 16K - 64K
+//            m_block_size_bytes = 32 ;
+//        else if ( m_header.source_file_size >= 2048 )  // 2K - 16K
+//            m_block_size_bytes = 16 ;
+//        else                                           // 0 - 2K
+//            m_block_size_bytes = 8 ;        
+//    }
+
     if ( mb_need_init_blocksize )
     {
-        if ( m_header.source_file_size >= 131072 )     // 128K -
+        if ( m_header.source_file_size >= 65536 )     // 64 -
             m_block_size_bytes = 128 ;
-        else if ( m_header.source_file_size >= 65536 ) // 64K - 128K
+        else  // 0 - 64K
             m_block_size_bytes = 64 ;
-        else if ( m_header.source_file_size >= 16384 ) // 16K - 64K
-            m_block_size_bytes = 32 ;
-        else if ( m_header.source_file_size >= 2048 )  // 2K - 16K
-            m_block_size_bytes = 16 ;
-        else                                           // 0 - 2K
-            m_block_size_bytes = 8 ;        
     }
 
     // init mpShift
@@ -259,7 +269,7 @@ void GammaCrypt::Initialize()
         mpShift = Shift256 ;
     else if ( m_block_size_bytes == 16 ) // 4K - 1M
         mpShift = Shift128 ;
-    else        // 0 - 4K
+    else //   m_block_size_bytes == 8     // 0 - 4K
         mpShift = Shift64 ;
     
     m_blk_sz_words = m_block_size_bytes / m_quantum_size ;
@@ -483,9 +493,28 @@ void GammaCrypt::EncryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_t
     #ifdef LFSR_ENBLD
     ( *mpShift )( mp_block_random.get() ) ;
     #endif // LFSR_ENBLD
-    
+
+//    for ( unsigned j = 0 ; j < m_quantum_size * 8 ; j++ )
+//    {
+//        for ( unsigned i = 1 ; i < m_blk_sz_words ; i++ )
+//        {
+//            params.p_source[ i ] += params.p_source[ i - 1 ] ;
+//            //x = (x >> k) | (x << (32 - k))
+//    //        unsigned * tsrc = & params.p_source[i] ;
+//    //        asm(  
+//    //            "rol %[arg_a] , 1 \n\t" 
+//    //            :[arg_a]"=r"( *tsrc )
+//    //        ) ;
+//        }
+//        params.p_source[ 0 ] += params.p_source[ m_blk_sz_words - 1 ] ;
+//
+//        for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
+//            params.p_source[i] = (params.p_source[i] << 1 ) | ( params.p_source[i] >> 31 ) ;
+//    }
+
     for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-        params.p_dest[i] = params.p_source[i] ^ mp_block_random[i] ;
+        params.p_dest[i] = params.p_source[ i ] ^ mp_block_random[ i ] ;
+
         
     #else
     
@@ -506,15 +535,15 @@ void GammaCrypt::EncryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_t
     
     // ----------- XOR2 ------------
 
-    #ifdef XOR_ENBLD
-
-    #ifdef LFSR_ENBLD
-    ( *mpShift )( mp_block_random.get() + offs_key2 / m_quantum_size ) ;
-    #endif // LFSR_ENBLD
-    for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-        params.p_dest[ i ] ^= mp_block_random[ i + offs_key2 / m_quantum_size ] ;
-    
-    #endif // XOR_ENBLD
+//    #ifdef XOR_ENBLD
+//
+//    #ifdef LFSR_ENBLD
+//    ( *mpShift )( mp_block_random.get() + offs_key2 / m_quantum_size ) ;
+//    #endif // LFSR_ENBLD
+//    for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
+//        params.p_dest[ i ] ^= mp_block_random[ i + offs_key2 / m_quantum_size ] ;
+//    
+//    #endif // XOR_ENBLD
 
 }
 
@@ -533,7 +562,10 @@ void GammaCrypt::EncryptBlockOneThr( unsigned nthr , unsigned n_pass_thr  ) noex
             params.p_dest[ uidx + i ] =  params.p_source[ uidx + i ] ^ mpkeys1[ n_pass_thr * mNblocks * m_blk_sz_words + uidx + i]  ;
         }
 		#else
+        for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
+        {
             params.p_dest[ uidx + i ] =  params.p_source[ uidx + i ] ;
+        }
 		#endif // XOR_ENBLD
         // ---------- REPOSITIONING ----------
 
@@ -605,16 +637,21 @@ void GammaCrypt::PreCalc( unsigned n_pass )
             for ( unsigned i = 0 ; i < mNblocks ; ++i )
             {
                 // ----------- KEY1 -----------
+                #ifdef LFSR_ENBLD
                 ( *mpShift )( mp_block_random.get() ) ;
+                #endif
+                #ifdef XOR_ENBLD
                 //memcpy( m_vkey1[ i ] , mp_block_random.get() , m_block_size_bytes ) ;
                 memcpy( mpkeys1 + n_pass * mNblocks * m_blk_sz_words + i * m_blk_sz_words , mp_block_random.get() , m_block_size_bytes ) ;
+                #endif
             
                 // ---------- PMA2, PMA1 ----------
+                #ifdef PERMUTATE_ENBLD
                 eTransformPMA2( m_Permutate.e_array2.get() , m_Permutate.epma_size_elms , m_op ) ;
                 memcpy( mppma2 + n_pass * mNblocks * m_Permutate.epma_size_elms + i * m_Permutate.epma_size_elms , m_Permutate.e_array2.get() , m_Permutate.epma_size_elms * sizeof( uint16_t ) ) ;
                 m_Permutate.eRearrangePMA1( mpu16e_temp_block_pma , m_Permutate.e_array2.get() ) ;
                 memcpy( mppma1 + n_pass * mNblocks * m_Permutate.epma_size_elms + i * m_Permutate.epma_size_elms , m_Permutate.e_array.get() , m_Permutate.epma_size_elms * sizeof( uint16_t ) ) ;
-
+                #endif
 //				// cout pma
 //				//m_dbg_ofs1 << "\n pma1 n_pass: " << n_pass << "\n" ;
 //                m_dbg_ofs1 << "\n pma1  _________" << " ____n_pass: " << n_pass << "\n" ;
@@ -625,8 +662,12 @@ void GammaCrypt::PreCalc( unsigned n_pass )
 
                 
                 // ----------- KEY2 ------------
+                #ifdef LFSR_ENBLD
                 ( *mpShift )( mp_block_random.get() + offs_key2 / m_quantum_size ) ;
+                #endif
+                #ifdef XOR_ENBLD
                 memcpy( mpkeys2 + n_pass * mNblocks * m_blk_sz_words + i * m_blk_sz_words , mp_block_random.get() + offs_key2 / m_quantum_size , m_block_size_bytes ) ;
+                #endif
 
             }
 }
@@ -1203,7 +1244,8 @@ void GammaCrypt::ReadOverheadData( std::istream & ifs )
         throw ("error: File too short, missing key block") ;
 
     for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-        mp_block_random[i] = block_key[i] ^ mp_block_password[i] ;
+        mp_block_random[i] = block_key[i]  ^ mp_block_password[i] ; // todo Uncomment it!!!!
+
 
     //Key2
     ifs.read( (char*) block_key.get() , m_block_size_bytes ) ;

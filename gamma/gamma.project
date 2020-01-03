@@ -21,6 +21,7 @@
     <File Name="include/helper.h"/>
     <File Name="../Display/ConsoleDisplay/include/display.h"/>
     <File Name="include/LFSR.h"/>
+    <File Name="../platform.h"/>
   </VirtualDirectory>
   <Settings Type="Executable">
     <GlobalSettings>
