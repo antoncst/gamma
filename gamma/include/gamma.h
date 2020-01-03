@@ -133,7 +133,7 @@ public:
 private:    
     bool mb_need_init_blocksize = true ; // for if block_size specified in command line or for decrypt
     bool mb_decrypting = false ;
-    static const unsigned m_blks_per_thr = 128*8*1024 ; // if the block size is 128 bytes, this is 128 MB per thread
+    static const unsigned m_blks_per_thr = 64*8*1024 ; // if the block size is 128 bytes, this is 128 MB per thread
     
     unsigned * mpkeys1 = nullptr , * mpkeys2 = nullptr ; // m-member, p-pointer
     uint16_t * mppma1 = nullptr , * mppma2 = nullptr ; // m-member, p-pointer
