@@ -535,15 +535,15 @@ void GammaCrypt::EncryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_t
     
     // ----------- XOR2 ------------
 
-//    #ifdef XOR_ENBLD
-//
-//    #ifdef LFSR_ENBLD
-//    ( *mpShift )( mp_block_random.get() + offs_key2 / m_quantum_size ) ;
-//    #endif // LFSR_ENBLD
-//    for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-//        params.p_dest[ i ] ^= mp_block_random[ i + offs_key2 / m_quantum_size ] ;
-//    
-//    #endif // XOR_ENBLD
+    #ifdef XOR_ENBLD
+
+    #ifdef LFSR_ENBLD
+    ( *mpShift )( mp_block_random.get() + offs_key2 / m_quantum_size ) ;
+    #endif // LFSR_ENBLD
+    for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
+        params.p_dest[ i ] ^= mp_block_random[ i + offs_key2 / m_quantum_size ] ;
+    
+    #endif // XOR_ENBLD
 
 }
 
