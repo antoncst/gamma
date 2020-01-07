@@ -97,7 +97,7 @@ public:
     unsigned m_tail_size_words ;
     unsigned m_tail_size_bytes ;
 
-	unsigned char * mce_temp_block ;
+	unsigned char * mc_temp_block ;
 	
     struct t_header
     {
@@ -133,7 +133,7 @@ public:
 private:    
     bool mb_need_init_blocksize = true ; // for if block_size specified in command line or for decrypt
     bool mb_decrypting = false ;
-    static const unsigned m_blks_per_thr = 8*8*1024 ; // if the block size is 128 bytes, this is 8 MB per thread, not counting memory for PreCalc()
+    unsigned m_blks_per_thr = 1*8*1024 ; // if the block size is 128 bytes, this is 1 MB per thread, not counting memory for PreCalc()
     
     unsigned * mpkeys1 = nullptr , * mpkeys2 = nullptr ; // m-member, p-pointer
     uint16_t * mppma1 = nullptr , * mppma2 = nullptr ; // m-member, p-pointer
@@ -142,10 +142,15 @@ private:
 	unsigned m_op ; // operation for TransformPMA2
 	
 	Threading m_Threading ;
-            
-    void EncryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_temp_block  ) noexcept ;
 
-    void DecryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_temp_block  ) noexcept ;
+    inline void MakeDiffusion( unsigned * psrc ) noexcept ;
+    inline void MakeConfusion( unsigned * psrc ) noexcept ;
+    inline void RemoveDiffusion( unsigned * psrc ) noexcept ;
+    //inline void RemoveConfusion( unsigned * psrc ) noexcept ;
+            
+    void EncryptBlock() noexcept ;
+
+    void DecryptBlock( uint16_t * t_invs_pma1 ) noexcept ;
 
 
     unsigned m_hrdw_concr ;

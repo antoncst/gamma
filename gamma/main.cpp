@@ -88,8 +88,8 @@ int main(int argc, char **argv)
     ofs.close() ;
     
     #ifdef DEBUG
-        std::cout << " Press Enter" << std::endl ;
-        getchar() ;
+        //std::cout << " Press Enter" << std::endl ;
+        //getchar() ;
     #endif
     
     return 0;
