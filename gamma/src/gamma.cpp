@@ -540,12 +540,12 @@ void GammaCrypt::EncryptBlock() noexcept
 
     #ifdef XOR_ENBLD
     
+    for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
+        params.p_dest[i] = params.p_source[ i ] ^ mpkeys1[ i ] ;
+
     #ifdef LFSR_ENBLD
     ( *mpShift )( mpkeys1 ) ;
     #endif // LFSR_ENBLD
-
-    for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-        params.p_dest[i] = params.p_source[ i ] ^ mpkeys1[ i ] ;
 
     MakeDiffusion( mpkeys1 ) ; // this is CONFUSION
     MakeDiffusion( params.p_dest ) ; 
@@ -599,7 +599,8 @@ void GammaCrypt::EncryptBlockOneThr( unsigned nthr , unsigned n_pass_thr  ) noex
 
         for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
         {
-            params.p_dest[ uidx + i ] =  params.p_source[ uidx + i ] ^ mpkeys1[ n_pass_thr * mNblocks * m_blk_sz_words + uidx + i]  ;
+            params.p_dest[ uidx + i ] =  params.p_source[ uidx + i ] 
+                                         ^ mpkeys1[ n_pass_thr * mNblocks * m_blk_sz_words + uidx + i]  ;
         }
 
 
@@ -609,7 +610,8 @@ void GammaCrypt::EncryptBlockOneThr( unsigned nthr , unsigned n_pass_thr  ) noex
         
         for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
         {
-            params.p_dest[ uidx + i ] =  params.p_dest[ uidx + i ] ^ mpkeys1[ n_pass_thr * mNblocks * m_blk_sz_words + m_blk_sz_words + uidx + i]  ;
+            params.p_dest[ uidx + i ] =  params.p_dest[ uidx + i ] 
+                                         ^ mpkeys1[ n_pass_thr * mNblocks * m_blk_sz_words + m_blk_sz_words + uidx + i]  ;
         }
 		#else
         for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
@@ -687,14 +689,20 @@ void GammaCrypt::PreCalc( unsigned n_pass )
             for ( unsigned i = 0 ; i < mNblocks ; ++i )
             {
                 // ----------- KEY1 -----------
-                #ifdef LFSR_ENBLD
-                ( *mpShift )( mp_block_random.get() ) ;
-                #endif
-                if ( n_pass == 0 && i == 0 )
-                memcpy( mpkeys1 + n_pass * mNblocks * m_blk_sz_words + i * m_blk_sz_words , mp_block_random.get() , m_block_size_bytes ) ;
                 #ifdef XOR_ENBLD
+
+                if ( n_pass == 0 && i == 0 )
+                    memcpy( mpkeys1 , mp_block_random.get() , m_block_size_bytes ) ;
+
+                #ifdef LFSR_ENBLD
+
+                ( *mpShift )( mp_block_random.get() ) ;
+
+                #endif
+
                 MakeDiffusion( mp_block_random.get() ) ; // this is CONFUSION
                 memcpy( mpkeys1 + n_pass * mNblocks * m_blk_sz_words + (i + 1) * m_blk_sz_words , mp_block_random.get() , m_block_size_bytes ) ;
+
                 #endif
             
                 // ---------- PMA2, PMA1 ----------
@@ -1013,7 +1021,7 @@ void GammaCrypt::DecryptBlock( uint16_t * t_invs_pma1 ) noexcept
     ( *mpShift )( mp_block_random.get() + m_blk_sz_words ) ;
     #endif
     
-//todo1 Uncomment !
+    //todo1 Uncomment !
     for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
         mp_block_source[i] = mp_block_source[i] ^ mp_block_random[ i + offs_key2 / m_quantum_size ] ;
     
@@ -1037,12 +1045,12 @@ void GammaCrypt::DecryptBlock( uint16_t * t_invs_pma1 ) noexcept
     #ifdef XOR_ENBLD
     // XOR1
 
+    memcpy( mc_temp_block , mp_block_random.get() , m_block_size_bytes ) ;
+    
     #ifdef LFSR_ENBLD
     ( *mpShift )( mp_block_random.get() ) ;
     #endif // LFSR_ENBLD
 
-    memcpy( mc_temp_block , mp_block_random.get() , m_block_size_bytes ) ;
-    
     MakeDiffusion( mp_block_random.get() ) ; // this is CONFUSION
 
     for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
