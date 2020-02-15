@@ -35,6 +35,7 @@ public:
     
     bool mb_blocksize_specified = false ;
     bool mb_use_keyfile = false ;
+    bool mb_perm_bits = false ;
     unsigned m_block_size ;
 
 /*    int password ; // 0 - password is not specified
@@ -57,6 +58,7 @@ static const std::string help_string  =
     "\n"
     "-s N  :  block size. N should be a power of 2.\n"
     "-k --keyfile :  use keyfile instead of generating keys.\n"
+    "-pb --permutate_bits :  permutate bits, default is perumtate bytes."
     "\n"
     "Examples:\n"
     "gamma   \n"

@@ -146,6 +146,10 @@ void CmdLnParser::ParseCommandLine( int argc , char **argv )
                     {
                         mb_use_keyfile = true ;
                     }
+                else if ( s == "-pb" || s == "--permutate_bits" )
+                    {
+                        mb_perm_bits = true ;
+                    }
                 else if ( s == "-h" || s == "--help" )
                     { m_b_error = true ; break ; } 
                 else

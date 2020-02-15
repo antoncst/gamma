@@ -2,7 +2,8 @@
 // In order to make it easy to include it all from other projects 
 
 //#include " display.h"
-#include "../Display/ConsoleDisplay/include/display.h"
+//#include "../Display/ConsoleDisplay/include/display.h"
+#include "../include/display.h"
 
 //----- GETCH -----
 

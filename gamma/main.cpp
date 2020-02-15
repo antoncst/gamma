@@ -43,6 +43,7 @@ int main(int argc, char **argv)
     
     gm.m_keyfilename = "keyfile" ;
     gm.mb_use_keyfile = parser.mb_use_keyfile ;
+    gm.m_perm_bytes = ! parser.mb_perm_bits ;
 
     
     if ( ! EnterPassword( password , parser.psw_input_twice ) )

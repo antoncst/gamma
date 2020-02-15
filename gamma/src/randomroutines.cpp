@@ -438,8 +438,13 @@ void TransformRandomCycle( unsigned * block_random , const size_t n_quantum )
 //------------- REPOSITIONING --------------------
 
 
-void eRearrange( unsigned char * p_block , unsigned char * temp_block , uint16_t * p_pm_earr , unsigned epma_size_elms , unsigned block_size_bytes ) noexcept
+void Permutate::eRearrange( unsigned char * p_block , unsigned char * temp_block , uint16_t * p_pm_earr , unsigned epma_size_elms , unsigned block_size_bytes , bool perm_bytes ) noexcept
 {
+    if ( perm_bytes )
+    {
+        RearrangeBytes( p_block , p_pm_earr , temp_block ) ;
+        return ;
+    }
 
     memset( temp_block , 0 , block_size_bytes ) ; // todo out away , нельзя убирать, т к биты задаются операцией |=, т е исходный бит д.б. сброшен
 
@@ -467,23 +472,36 @@ void eRearrange( unsigned char * p_block , unsigned char * temp_block , uint16_t
 }
 
 
-void Permutate::Init( size_t block_size )
+void Permutate::Init( unsigned block_size , bool perm_bytes )
+{
+    m_perm_bytes = perm_bytes ;
+    //Extended (in memory) Permutation Array size, elements
+    if ( m_perm_bytes )
+        epma_size_elms = block_size ;
+    else
+        epma_size_elms = block_size * 8 ; // block size bytes * 8 bits
+
+    m_BIarray.Init( block_size , perm_bytes ) ;
+    m_BIarray2.Init( block_size , perm_bytes ) ;
+    e_array = std::make_unique< uint16_t[] >( m_BIarray.max_index) ;
+    e_array2 = std::make_unique< uint16_t[] >( m_BIarray2.max_index) ;
+} 
+
+void Permutate::Init8( unsigned block_size )
 {
     //Extended (in memory) Permutation Array size, elements
     epma_size_elms = block_size * 8 ; // block size bytes * 8 bits
-    m_BIarray.Init( block_size ) ;
-    m_BIarray2.Init( block_size ) ;
+    m_BIarray.Init8( block_size ) ;
+    m_BIarray2.Init8( block_size ) ;
     e_array = std::make_unique< uint16_t[] >( m_BIarray.max_index) ;
     e_array2 = std::make_unique< uint16_t[] >( m_BIarray2.max_index) ;
 } 
 
 void Permutate::InversePermutArr( BitsetItmesArray & bi_arr )
 {
-    //std::vector< uint16_t > inverse_pma ;
-    BitsetItmesArray inverse_pma ;
-    inverse_pma.Init( bi_arr.block_size_bytes  ) ;
+    BitsetItmesArray inverse_pma ; // BitsetItmesArray allocates memory, it must not be into cycle
+    inverse_pma.Init( bi_arr.block_size_bytes , m_perm_bytes ) ;
     
-    //inverse_pma.reserve( max_index ) ;
     for ( unsigned i = 0 ; i < bi_arr.max_index ;  ++i )
     {
         inverse_pma.set( bi_arr[ i ] , i ) ;
@@ -508,7 +526,7 @@ void Permutate::MakePermutArr( uint16_t * earr , unsigned char * pc_randoms , Bi
         indexes_container.push_back( i ) ;
 
     BitsetItmesArray BI_rands ;
-    BI_rands.Init( /*N_bytes*/ bi_arr.block_size_bytes ) ;
+    BI_rands.Init( /*N_bytes*/ bi_arr.block_size_bytes , m_perm_bytes) ;
 
     assert( bi_arr.pma_size_bytes % 4 == 0 ) ;
     //GenerateRandoms( bi_arr.pma_size_bytes / 4 , ( unsigned * ) BI_rands.m_array.get() ) ;
@@ -536,10 +554,10 @@ void Permutate::MakePermutArr( uint16_t * earr , unsigned char * pc_randoms , Bi
     }
 } ;
 
-void Permutate::Rearrange( unsigned char * p_block , uint16_t bytes_read , unsigned char * temp_block ) noexcept
+void Permutate::Rearrange( unsigned char * p_block , unsigned char * temp_block ) noexcept
 {
     
-    memset( temp_block , 0 , m_BIarray.block_size_bytes ) ; // todo out away
+    //memset( temp_block , 0 , m_BIarray.block_size_bytes ) ; // todo out away
 
     BitArray src_BA( p_block ) ;
     BitArray res_BA( temp_block ) ;
@@ -563,6 +581,13 @@ void Permutate::Rearrange( unsigned char * p_block , uint16_t bytes_read , unsig
     }
     memcpy(  p_block , temp_block , m_BIarray.block_size_bytes ) ; //todo realize move semantic
     
+}
+
+void Permutate::RearrangeBytes( unsigned char * p_block , uint16_t * p_pm_earr , unsigned char * temp_block ) noexcept
+{
+    for ( uint16_t i = 0 ; i < m_BIarray.max_index ; ++i )
+        temp_block[ i ] = p_block[ p_pm_earr[ i ] ] ;
+    memcpy(  p_block , temp_block , m_BIarray.block_size_bytes ) ; //todo realize move semantic
 }
 
 void Permutate::eRearrangePMA1( uint16_t * temp_block , uint16_t * p_pm_earr ) noexcept
@@ -612,11 +637,39 @@ void eTransformPMA2( uint16_t * e_array2 , const unsigned N , unsigned & op )
 
 
 
-void BitsetItmesArray::Init( size_t block_size )
+void BitsetItmesArray::Init( size_t block_size , bool perm_bytes )
 {
     block_size_bytes = block_size ;
     // есть блок размером m_block_size байт
-    //допустим переставляем биты, тогда нужно адресовать :
+    if ( perm_bytes )
+        //переставляем байты, тогда нужно адресовать :
+        max_index = block_size_bytes ;
+    else
+        //переставляем биты, тогда нужно адресовать :
+        max_index = block_size_bytes * 8 ;
+
+    // Для хранения одного индекса нужно log2 ( m_max_index ) бит ;
+    uint16_t temp = max_index ;
+    index_size_bits = 0 ; 
+    while ( temp >>= 1 ) index_size_bits ++ ;
+    // Для хранения всех индексов нужно
+    pma_size_bits = max_index * index_size_bits ;
+    pma_size_bytes = pma_size_bits / 8 ;
+    if ( pma_size_bits % 8 != 0 ) // это вряд ли, но на всякий случай
+        pma_size_bytes++ ;
+        
+    // выделим память и инициализируем BitArray
+    m_array = std::make_unique<unsigned char[]>( pma_size_bytes ) ;
+
+    m_pmaBA.Init( m_array.get() ) ;
+
+}
+
+void BitsetItmesArray::Init8( size_t block_size )
+{
+    block_size_bytes = block_size ;
+    // есть блок размером m_block_size байт
+    //переставляем биты, тогда нужно адресовать :
     max_index = block_size_bytes * 8 ;
     // Для хранения одного индекса нужно log2 ( m_max_index ) бит ;
     uint16_t temp = max_index ;
@@ -634,6 +687,8 @@ void BitsetItmesArray::Init( size_t block_size )
     m_pmaBA.Init( m_array.get() ) ;
 
 }
+
+
 
 /*inline*/ uint16_t BitsetItmesArray::operator []( uint16_t index ) noexcept
 {

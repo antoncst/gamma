@@ -36,10 +36,9 @@ struct ParamsForCryBl
     //unsigned blks_per_thr ;
     uint16_t * e_array ;
     uint16_t * e_array2 ;
+    unsigned blk_sz_bytes ;
     unsigned epma_sz_elmnts ;
 } ;
-
-static ParamsForCryBl params ;
 
 class GammaCrypt ;
 
@@ -73,13 +72,17 @@ public:
     void Encrypt() ;
     void Decrypt() ;
     void GenKeyToFile() ;
-	
+    
 	// Предварительные расчёты keys, pma's
 	void PreCalc( unsigned n_pass ) ;
     
     void SetBlockSize( unsigned block_size ) ;
     void mGenerateRandoms() ;
     void MakePswBlock() ;
+    
+    bool m_perm_bytes = true ;
+    // parameters for crypting block:
+    ParamsForCryBl params ;
     
     std::istream & m_ifs ;
     std::fstream m_ifs_keyfile ;
@@ -104,6 +107,8 @@ public:
         // 0x00
         // bit7 (high bit) == 0 - file contains keys (and pma's)
         // bit7 (high bit) == 1 - keys are in the keyfile
+        // bit6 == 0 - permutate bytes
+        // bit6 == 1 - permutate bits
         uint8_t major_ver = 0x00 ;
         uint8_t minor_ver = 0x00 ;
         // 0x02
@@ -129,11 +134,18 @@ public:
     std::unique_ptr< t_block > mp_block_random ; // mp_...   m - member, p - pointer
     //obsolete: std::unique_ptr< t_block > mp_block_random3 ;
     
+    std::string m_keyfilename ;
 
+    unsigned offs_ktail ;
 private:    
+    //offsets bytes:
+    unsigned offs_key2 ;
+    unsigned offs_pma1 ;
+    unsigned offs_pma2 ;
+
     bool mb_need_init_blocksize = true ; // for if block_size specified in command line or for decrypt
     bool mb_decrypting = false ;
-    unsigned m_blks_per_thr = 1*8*1024 ; // if the block size is 128 bytes, this is 1 MB per thread, not counting memory for PreCalc()
+    const unsigned m_blks_per_thr = 1*8*1024 ; // if the block size is 128 bytes, this is 1 MB per thread, not counting memory for PreCalc()
     
     unsigned * mpkeys1 = nullptr , * mpkeys2 = nullptr ; // m-member, p-pointer
     uint16_t * mppma1 = nullptr , * mppma2 = nullptr ; // m-member, p-pointer
@@ -176,15 +188,6 @@ private:
     
     const std::string & m_password ;
     
-    //offsets bytes:
-    unsigned offs_key2 ;
-    unsigned offs_pma1 ;
-    unsigned offs_pma2 ;
-public:
-    unsigned offs_ktail ;
-    std::string m_keyfilename ;
-private:
-
     std::unique_ptr< t_block > mp_block_password ;
     std::unique_ptr< unsigned char[] > mpc_block_psw_pma ; // c - char
     std::unique_ptr< t_block > mp_block_source ;
