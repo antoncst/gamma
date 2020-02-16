@@ -4,10 +4,12 @@
 #include <fstream>
 #include <cassert>
 
+#include "gamma_intfc.h"
 #include "gamma.h"
 #include "../../Display/ConsoleDisplay/include/display.h"
 #include "helper.h"
 #include <cstdio>
+#include <memory>
 
 int main(int argc, char **argv)
 {
@@ -39,15 +41,15 @@ int main(int argc, char **argv)
     std::string password ;
     password = "1234567890AB" ;
     
-    GammaCrypt gm( ifs , ofs , password ) ;
-    
-    gm.m_keyfilename = "keyfile" ;
-    gm.mb_use_keyfile = parser.mb_use_keyfile ;
-    gm.m_perm_bytes = ! parser.mb_perm_bits ;
-
-    
     if ( ! EnterPassword( password , parser.psw_input_twice ) )
         return 2 ;
+    
+    std::unique_ptr<GammaCrypt> gm = std::make_unique<GammaCryptImpl>( ifs , ofs , password ) ;
+    
+    gm->SetKeyFilename( "keyfile" ) ;
+    gm->UseKeyfile( parser.mb_use_keyfile ) ;
+    gm->PermutateBytes( ! parser.mb_perm_bits ) ;
+
     
     // open out file
     try
@@ -55,7 +57,7 @@ int main(int argc, char **argv)
         if ( parser.action != parser.genkey )
             OpenOutFile( parser.m_out_filename , ofs ) ;
         else // genkey
-            OpenOutFile( gm.m_keyfilename , ofs ) ;
+            OpenOutFile( gm->GetKeyFilename() , ofs ) ;
     }
     catch ( const char * s )
     {
@@ -69,15 +71,15 @@ int main(int argc, char **argv)
         if ( parser.action == parser.none || parser.action == parser.encrypt || parser.action == parser.genkey )
         {
             if ( parser.mb_blocksize_specified )
-                gm.SetBlockSize( parser.m_block_size ) ;
+                gm->SetBlockSize( parser.m_block_size ) ;
 
             if ( parser.action == parser.none || parser.action == parser.encrypt )
-                gm.Encrypt() ;
+                gm->Encrypt() ;
             else
-                gm.GenKeyToFile() ;
+                gm->GenKeyToFile() ;
         }
             else
-                gm.Decrypt() ;
+                gm->Decrypt() ;
     }
     catch( const char * s) 
     {

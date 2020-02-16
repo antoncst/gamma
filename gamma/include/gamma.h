@@ -2,6 +2,7 @@
 #define GAMMA_H_INCLUDED
 
 #include "../platform.h"
+#include "gamma_intfc.h"
 #include "randomroutines.h"
 
 #include <string>
@@ -40,13 +41,13 @@ struct ParamsForCryBl
     unsigned epma_sz_elmnts ;
 } ;
 
-class GammaCrypt ;
+class GammaCryptImpl ;
 
 class Threading
 {
 public:
-	void Process( GammaCrypt * GC , unsigned Nthr ) ;
-	GammaCrypt * mpGC ; 
+	void Process( GammaCryptImpl * GC , const unsigned Nthr ) ;
+	GammaCryptImpl * mpGC ; 
 	unsigned m_Nthr = 0 ;
 private:
 	std::shared_timed_mutex m_mutex ;
@@ -61,26 +62,45 @@ private:
 } ;
 
 
-class GammaCrypt
+class GammaCryptImpl : public GammaCrypt
 {
 public:
-    GammaCrypt( std::istream & ifs , std::ostream & ofs , const std::string & password ) ;
+    GammaCryptImpl( std::istream & ifs , std::ostream & ofs , const std::string & password ) ;
 
 	//std::ofstream m_dbg_ofs1 ;
 	//std::ofstream m_dbg_ofs2 ;
 
-    void Encrypt() ;
-    void Decrypt() ;
-    void GenKeyToFile() ;
+    virtual void Encrypt() override ;
+    virtual void Decrypt() override ;
+    virtual void GenKeyToFile() override ;
+    virtual void SetBlockSize( unsigned block_size ) override ;
+
+    // mb_use_keyfile == true    use keyfile
+    // mb_use_keyfile == false   generate keys and stores them into encrypted file (default)
+    virtual void UseKeyfile( bool use_keyfile ) override { mb_use_keyfile = use_keyfile ; } ;
     
+    virtual void SetKeyFilename( const std::string & keyfilename ) override { m_keyfilename = keyfilename ; } ;
+
+    virtual const std::string & GetKeyFilename() override { return m_keyfilename ; } ;
+    
+    // m_perm_bytes == true    permutate bytes (default)
+    // m_perm_bytes == false   permutate bits
+    virtual void PermutateBytes( bool perm_bytes ) override { m_perm_bytes = perm_bytes ; } ;
+
+    bool mb_use_keyfile = false ;
+    std::string m_keyfilename ;
+    // m_perm_bytes == true    permutate bytes
+    // m_perm_bytes == false   permutate bits
+    bool m_perm_bytes = true ;
+    
+    friend class Threading ;
+private:
 	// Предварительные расчёты keys, pma's
-	void PreCalc( unsigned n_pass ) ;
+	void PreCalc( const unsigned n_pass ) ;
     
-    void SetBlockSize( unsigned block_size ) ;
     void mGenerateRandoms() ;
     void MakePswBlock() ;
     
-    bool m_perm_bytes = true ;
     // parameters for crypting block:
     ParamsForCryBl params ;
     
@@ -124,7 +144,6 @@ public:
 
     size_t m_block_size_bytes = 64 ;    // in bytes , further calculated in Initialize method, deponds on file size
     bool mb_multithread = false ;
-    bool mb_use_keyfile = false ;
 
     // block random
     // N = m_blk_sz_words / 4 
@@ -134,10 +153,8 @@ public:
     std::unique_ptr< t_block > mp_block_random ; // mp_...   m - member, p - pointer
     //obsolete: std::unique_ptr< t_block > mp_block_random3 ;
     
-    std::string m_keyfilename ;
-
     unsigned offs_ktail ;
-private:    
+//private:    
     //offsets bytes:
     unsigned offs_key2 ;
     unsigned offs_pma1 ;

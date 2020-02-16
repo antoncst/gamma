@@ -17,6 +17,7 @@
     <File Name="src/LFSR.cpp"/>
   </VirtualDirectory>
   <VirtualDirectory Name="include">
+    <File Name="include/gamma_intfc.h"/>
     <File Name="include/check.h"/>
     <File Name="include/gamma.h"/>
     <File Name="include/randomroutines.h"/>

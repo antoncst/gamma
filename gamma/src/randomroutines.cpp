@@ -487,16 +487,6 @@ void Permutate::Init( unsigned block_size , bool perm_bytes )
     e_array2 = std::make_unique< uint16_t[] >( m_BIarray2.max_index) ;
 } 
 
-void Permutate::Init8( unsigned block_size )
-{
-    //Extended (in memory) Permutation Array size, elements
-    epma_size_elms = block_size * 8 ; // block size bytes * 8 bits
-    m_BIarray.Init8( block_size ) ;
-    m_BIarray2.Init8( block_size ) ;
-    e_array = std::make_unique< uint16_t[] >( m_BIarray.max_index) ;
-    e_array2 = std::make_unique< uint16_t[] >( m_BIarray2.max_index) ;
-} 
-
 void Permutate::InversePermutArr( BitsetItmesArray & bi_arr )
 {
     BitsetItmesArray inverse_pma ; // BitsetItmesArray allocates memory, it must not be into cycle
@@ -556,7 +546,7 @@ void Permutate::MakePermutArr( uint16_t * earr , unsigned char * pc_randoms , Bi
 
 void Permutate::Rearrange( unsigned char * p_block , unsigned char * temp_block ) noexcept
 {
-    
+
     //memset( temp_block , 0 , m_BIarray.block_size_bytes ) ; // todo out away
 
     BitArray src_BA( p_block ) ;
@@ -664,30 +654,6 @@ void BitsetItmesArray::Init( size_t block_size , bool perm_bytes )
     m_pmaBA.Init( m_array.get() ) ;
 
 }
-
-void BitsetItmesArray::Init8( size_t block_size )
-{
-    block_size_bytes = block_size ;
-    // есть блок размером m_block_size байт
-    //переставляем биты, тогда нужно адресовать :
-    max_index = block_size_bytes * 8 ;
-    // Для хранения одного индекса нужно log2 ( m_max_index ) бит ;
-    uint16_t temp = max_index ;
-    index_size_bits = 0 ; 
-    while ( temp >>= 1 ) index_size_bits ++ ;
-    // Для хранения всех индексов нужно
-    pma_size_bits = max_index * index_size_bits ;
-    pma_size_bytes = pma_size_bits / 8 ;
-    if ( pma_size_bits % 8 != 0 ) // это вряд ли, но на всякий случай
-        pma_size_bytes++ ;
-        
-    // выделим память и инициализируем BitArray
-    m_array = std::make_unique<unsigned char[]>( pma_size_bytes ) ;
-
-    m_pmaBA.Init( m_array.get() ) ;
-
-}
-
 
 
 /*inline*/ uint16_t BitsetItmesArray::operator []( uint16_t index ) noexcept
