@@ -129,7 +129,7 @@ void Threading::Process( GammaCryptImpl * pGC , const unsigned Nthr )
 				//assert( tail_size_read == tail_size_bytes ) ;
 				//mNblocks++ ;
 				// тогда остаток блока надо добить randoms[m_blk_sz_words*2] .. randoms[m_blk_sz_words*2 + tail_size_bytes]
-				memcpy( (char*) mpGC->params.p_source + tail_size_read, /*reinterpret_cast< unsigned char * >*/ (unsigned char *) ( mpGC->mp_block_random.get() ) + mpGC->offs_ktail , mpGC->m_block_size_bytes - tail_size_read ) ;
+				memcpy( (char*) mpGC->params.p_source + tail_size_read, /*reinterpret_cast< unsigned char * >*/ reinterpret_cast< unsigned char * >( mpGC->m32_block_random ) + mpGC->offs_ktail , mpGC->m_block_size_bytes - tail_size_read ) ;
 			}
 			
 		}
@@ -221,8 +221,8 @@ void Threading::Process( GammaCryptImpl * pGC , const unsigned Nthr )
 
 
 GammaCryptImpl::GammaCryptImpl( std::istream & ifs , std::ostream & ofs ,  const std::string & password ) 
-    : m_ifs( ifs ) , m_ofs( ofs ) , mp_block_random( nullptr ) ,  m_password( password )  
-    , mp_block_password( nullptr ) , mp_block_source( nullptr ) , mp_block_dest( nullptr )
+    : m_ifs( ifs ) , m_ofs( ofs ) , mu32_block_random( nullptr ) ,  m_password( password )  
+    , mu32_block_password( nullptr ) , mu32_block_source( nullptr ) , mu32_block_dest( nullptr )
 	
 {
 	m_Threading.mpGC = this  ;
@@ -281,13 +281,16 @@ void GammaCryptImpl::Initialize()
     m_Permutate.Init( m_block_size_bytes , m_perm_bytes ) ;
 
     // allocate memory
-    mpc_block_psw_pma = std::make_unique< unsigned char[] >( m_Permutate.m_BIarray.pma_size_bytes ) ;
+    m8_block_psw_pma = std::make_unique< unsigned char[] >( m_Permutate.m_BIarray.pma_size_bytes ) ;
 
     // allocate memory
-    mp_block_password  = std::make_unique< t_block >( m_blk_sz_words ) ;
+    mu32_block_password  = std::make_unique< t_block >( m_blk_sz_words ) ;
+    m32_block_password = mu32_block_password.get() ;
     // obsolete: mp_block_random3   = make_unique< t_block >( m_blk_sz_words + 1 ) ; // obsolete: to transform Random block it is required one quantum more (therefore "+1")
-    mp_block_source    = std::make_unique< t_block >( m_blk_sz_words ) ;
-    mp_block_dest      = std::make_unique< t_block >( m_blk_sz_words ) ;
+    mu32_block_source    = std::make_unique< t_block >( m_blk_sz_words ) ;
+    m32_block_source = mu32_block_source.get() ;
+    mu32_block_dest      = std::make_unique< t_block >( m_blk_sz_words ) ;
+    m32_block_dest = mu32_block_dest.get() ;
 
     // block random
     // N = m_blk_sz_words / 4 
@@ -302,10 +305,11 @@ void GammaCryptImpl::Initialize()
 
     m_rnd_size_words = m_blk_sz_words * 2 + m_Permutate.m_BIarray.pma_size_bytes * 2 / m_quantum_size + m_blk_sz_words - m_tail_size_words + 1 ;
 
-    mp_block_random = std::make_unique< t_block >( m_rnd_size_words ) ; 
+    mu32_block_random = std::make_unique< t_block >( m_rnd_size_words ) ;
+    m32_block_random = mu32_block_random.get() ;
 
     // m_Permutate Initializing (continue)
-    m_Permutate.mpc_randoms = reinterpret_cast< unsigned char * >( mp_block_random.get() ) ;
+    m_Permutate.mp8_randoms = reinterpret_cast< unsigned char * >( m32_block_random ) ;
 
     offs_key2 = m_block_size_bytes ;
     offs_pma1 = m_block_size_bytes * 2 ;
@@ -341,7 +345,7 @@ void GammaCryptImpl::MakePswBlock()
     while ( i < m_block_size_bytes )
     {
         bytes_to_copy =  i + psw_size  <= m_block_size_bytes  ?  psw_size : m_block_size_bytes - i ;
-        memcpy( reinterpret_cast<char*>( mp_block_password.get() ) + i , m_password.c_str(), bytes_to_copy ) ;
+        memcpy( reinterpret_cast<char*>( m32_block_password ) + i , m_password.c_str(), bytes_to_copy ) ;
         i += bytes_to_copy ;
     }
     assert( i == m_block_size_bytes ) ;
@@ -359,7 +363,7 @@ void GammaCryptImpl::MakePswBlock()
 
     // 1.
     for ( unsigned i = 0 ; i < N ; ++i )
-        ( *mpShift )( mp_block_password.get() ) ;
+        ( *mpShift )( m32_block_password ) ;
 
     const unsigned block_size_bytes = m_block_size_bytes ;
     Permutate Pmt ;
@@ -373,10 +377,10 @@ void GammaCryptImpl::MakePswBlock()
     for ( unsigned i = 0 ; i < pma_size_bytes ; i += block_size_bytes )
     {
         for ( unsigned j = 0 ; j < N ; ++j )
-            ( *mpShift )( mp_block_password.get() ) ;
+            ( *mpShift )( m32_block_password ) ;
 
         bytes_to_copy = ( i + block_size_bytes > pma_size_bytes ) ? (i + block_size_bytes) - pma_size_bytes  : block_size_bytes ;
-        std::memcpy( up_block_rnd.get() + i , mp_block_password.get() , block_size_bytes ) ;
+        std::memcpy( up_block_rnd.get() + i , m32_block_password , block_size_bytes ) ;
     }
 
     auto up_block_rnd2 = std::make_unique< unsigned char[] >( pma_size_bytes ) ;
@@ -385,19 +389,19 @@ void GammaCryptImpl::MakePswBlock()
     for ( unsigned i = 0 ; i < pma_size_bytes ; i += block_size_bytes )
     {
         for ( unsigned j = 0 ; j < N ; ++j )
-            ( *mpShift )( mp_block_password.get() ) ;
+            ( *mpShift )( m32_block_password ) ;
         bytes_to_copy = ( i + block_size_bytes > pma_size_bytes ) ? (i + block_size_bytes) - pma_size_bytes  : block_size_bytes ;
 
-        std::memcpy( up_block_rnd2.get() + i , mp_block_password.get() , block_size_bytes ) ;
+        std::memcpy( up_block_rnd2.get() + i , m32_block_password , block_size_bytes ) ;
     }
 
     // 4. PMA2
-    Pmt.mpc_randoms = up_block_rnd2.get() ;
-    Pmt.MakePermutArr( Pmt.e_array2.get() , Pmt.mpc_randoms , Pmt.m_BIarray2 ) ; //
+    Pmt.mp8_randoms = up_block_rnd2.get() ;
+    Pmt.MakePermutArr( Pmt.m16e_arr2 , Pmt.mp8_randoms , Pmt.m_BIarray2 ) ; //
     
     // 5. PMA1
-    Pmt.mpc_randoms = up_block_rnd.get() ;
-    Pmt.MakePermutArr( Pmt.e_array.get() , Pmt.mpc_randoms , Pmt.m_BIarray ) ; //
+    Pmt.mp8_randoms = up_block_rnd.get() ;
+    Pmt.MakePermutArr( Pmt.m16e_arr , Pmt.mp8_randoms , Pmt.m_BIarray ) ; //
     
     auto temp_block = std::make_unique< unsigned char[] >( block_size_bytes ) ; 
     auto e_temp_block_pma = std::make_unique< uint16_t[] >( Pmt.epma_size_elms ) ; // for ePMA2
@@ -411,35 +415,35 @@ void GammaCryptImpl::MakePswBlock()
 
     if ( GC_pma_size_bytes > block_size_bytes )
         assert( GC_pma_size_bytes % block_size_bytes == 0 ) ;
-    // 6. GammaCryptImpl::mpc_block_psw_pma
+    // 6. GammaCryptImpl::m8_block_psw_pma
     for ( unsigned i = 0 ; i < GC_pma_size_bytes  ; i += increment )
     {
         unsigned op = 0 ; 
         for ( unsigned j = 0 ; j < Neven ; ++ j )
         {
-            ( *mpShift )( mp_block_password.get() ) ;
+            ( *mpShift )( m32_block_password ) ;
 
 
-            eTransformPMA2( Pmt.e_array2.get() , Pmt.epma_size_elms , op ) ;
-            Pmt.eRearrangePMA1( e_temp_block_pma.get() , Pmt.e_array2.get() ) ;
+            eTransformPMA2( Pmt.m16e_arr2 , Pmt.epma_size_elms , op ) ;
+            Pmt.eRearrangePMA1( e_temp_block_pma.get() , Pmt.m16e_arr2 ) ;
 
-            Pmt.eRearrange( ( ( unsigned char*) mp_block_password.get() ) , temp_block.get() , Pmt.e_array.get() , Pmt.epma_size_elms , block_size_bytes , false ) ;
+            Pmt.eRearrange( ( ( unsigned char*) m32_block_password ) , temp_block.get() , Pmt.m16e_arr , Pmt.epma_size_elms , block_size_bytes , false ) ;
             
         }
-        memcpy( mpc_block_psw_pma.get() + i , ( unsigned char*) mp_block_password.get() , increment ) ;
+        memcpy( m8_block_psw_pma.get() + i , ( unsigned char*) m32_block_password , increment ) ;
     }
     
-    // 7. GammaCryptImpl::mp_block_password
+    // 7. GammaCryptImpl::m32_block_password
     unsigned op = 0 ;
     for ( unsigned i = 0 ; i < N ; ++ i )
     {
-        ( *mpShift )( mp_block_password.get() ) ;
+        ( *mpShift )( m32_block_password ) ;
 
 
-        eTransformPMA2( Pmt.e_array2.get() , Pmt.epma_size_elms , op ) ;
-        Pmt.eRearrangePMA1( e_temp_block_pma.get() , Pmt.e_array2.get() ) ;
+        eTransformPMA2( Pmt.m16e_arr2 , Pmt.epma_size_elms , op ) ;
+        Pmt.eRearrangePMA1( e_temp_block_pma.get() , Pmt.m16e_arr2 ) ;
 
-        Pmt.eRearrange( ( ( unsigned char*) mp_block_password.get() ) , temp_block.get() , Pmt.e_array.get() , Pmt.epma_size_elms , block_size_bytes , false ) ;
+        Pmt.eRearrange( ( ( unsigned char*) m32_block_password ) , temp_block.get() , Pmt.m16e_arr , Pmt.epma_size_elms , block_size_bytes , false ) ;
         
     }
     
@@ -455,81 +459,33 @@ void GammaCryptImpl::MakePswBlock()
 }
 
 
-/*
-void GammaCryptImpl::DecryptBlock( uint16_t * e_temp_block_pma , unsigned char * e_temp_block , unsigned & op ) noexcept
+inline void GammaCryptImpl::MakeDiffusion( unsigned * p32src) noexcept
 {
-    #ifdef XOR_ENBLD
-    // XOR2
-    
-    #ifdef LFSR_ENBLD
-    ( *mpShift )( mp_block_random.get() + m_blk_sz_words ) ;
-    #endif
-    
-    for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-        mp_block_source[i] = mp_block_source[i] ^ mp_block_random[ i + offs_key2 / m_quantum_size ] ;
-    
-    #endif // XOR_ENBLD
-
-    #ifdef PERMUTATE_ENBLD
-    //REPOSITIONING
-    
-    // transform pma2
-    eTransformPMA2( m_Permutate.e_array2.get() , m_Permutate.epma_size_elms , op ) ;
-
-    //rearrange pma1
-    m_Permutate.eRearrangePMA1( e_temp_block_pma.get() , m_Permutate.e_array2.get() ) ;
-    //inverse pma1
-    m_Permutate.InverseExpPermutArr( t_invs_pma1.get() , m_Permutate.e_array.get() ) ;
-    eRearrange( ( unsigned char*) mp_block_source.get() , temp_block.get() , t_invs_pma1.get() , m_Permutate.epma_size_elms , m_block_size_bytes ) ;
-
-    #endif // PERMUTATE_ENBLD
-    
-    #ifdef XOR_ENBLD
-    // XOR1
-
-    #ifdef LFSR_ENBLD
-    ( *mpShift )( mp_block_random.get() ) ;
-    #endif // LFSR_ENBLD
-
-    for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-        mp_block_dest[i] = mp_block_source[i] ^ mp_block_random[i] ;
-        
-    #else
-    for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-        mp_block_dest[i] = mp_block_source[i] ;
-    #endif // XOR_ENBLD
-    
-}
-*/
-
-
-inline void GammaCryptImpl::MakeDiffusion( unsigned * psrc) noexcept
-{
-//    memcpy( mc_temp_block , psrc , m_block_size_bytes ) ;
+//    memcpy( m8_temp_block , p32src , m_block_size_bytes ) ;
 //    //для удобства:
-//    psrc = mc_temp_block ;
+//    p32src = m8_temp_block ;
     
-    for ( unsigned j = 0 ; j <= 9 /*m_quantum_size * 8*/ ; j++ )
+    for ( unsigned j = 0 ; j <= 9 ; j++ )
     {
         //arithmetic manipulations
         for ( unsigned i = 1 ; i < m_blk_sz_words ; i++ )
         {
-            psrc[ i ] += psrc[ i - 1 ] ;
+            p32src[ i ] += p32src[ i - 1 ] ;
         }
-        psrc[ 0 ] += psrc[ m_blk_sz_words - 1 ] ;
+        p32src[ 0 ] += p32src[ m_blk_sz_words - 1 ] ;
 
         // left circular shift
         for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ ) // 32 bit rolls
             if ( j < 4 )
-                psrc[i] = ( psrc[i] << 1 ) | ( psrc[i] >> 31 ) ; // 6 rolls
+                p32src[i] = ( p32src[i] << 1 ) | ( p32src[i] >> 31 ) ; // 6 rolls
             else if ( j == 4 )
-                psrc[i] = ( psrc[i] << 4 ) | ( psrc[i] >> 28 ) ; // 4 rolls
+                p32src[i] = ( p32src[i] << 4 ) | ( p32src[i] >> 28 ) ; // 4 rolls
             else if ( j == 5 )
-                psrc[i] = ( psrc[i] << 2 ) | ( psrc[i] >> 30 ) ; // 2 rolls
+                p32src[i] = ( p32src[i] << 2 ) | ( p32src[i] >> 30 ) ; // 2 rolls
             else if ( j == 7 )
-                psrc[i] = ( psrc[i] << 5 ) | ( psrc[i] >> 27 ) ; // 5 rolls
+                p32src[i] = ( p32src[i] << 5 ) | ( p32src[i] >> 27 ) ; // 5 rolls
             else if ( j == 8 &&  ( i % 2 == 0 ) )
-                psrc[i] = ( psrc[i] << 16 ) | ( psrc[i] >> 16 ) ; // 15 rolls
+                p32src[i] = ( p32src[i] << 16 ) | ( p32src[i] >> 16 ) ; // 15 rolls
     }
 
 //    for ( unsigned j = 0 ; j < m_quantum_size * 8 ; j++ )
@@ -559,38 +515,38 @@ void GammaCryptImpl::EncryptBlock() noexcept
 
     #ifdef XOR_ENBLD
         for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-            params.p_dest[i] = params.p_source[ i ] ^ mpkeys1[ i ] ;
+            params.p_dest[i] = params.p_source[ i ] ^ mp32keys1[ i ] ;
     #else
         for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
             params.p_dest[i] = params.p_source[i] ;
     #endif
 
     #ifdef LFSR_ENBLD
-    ( *mpShift )( mpkeys1 ) ;
+    ( *mpShift )( mp32keys1 ) ;
     #endif // LFSR_ENBLD
 
     #ifdef DIFFUSION_ENBLD
-        MakeDiffusion( mpkeys1 ) ; // this is CONFUSION
+        MakeDiffusion( mp32keys1 ) ; // this is CONFUSION
         MakeDiffusion( params.p_dest ) ; 
     #endif
 
     #ifdef XOR_ENBLD
         for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-            params.p_dest[i] = params.p_dest[ i ] ^ mpkeys1[ i ] ;
+            params.p_dest[i] = params.p_dest[ i ] ^ mp32keys1[ i ] ;
     #endif  // XOR_ENBLD
 
     // ---------- REPOSITIONING ----------
 
     #ifdef PERMUTATE_ENBLD
-        eTransformPMA2( mppma2 , m_Permutate.epma_size_elms , m_op ) ;
+        eTransformPMA2( mp16pma2 , m_Permutate.epma_size_elms , m_op ) ;
 
         #ifdef DEBUG
-            CheckPermutArr( mppma2 , m_Permutate.epma_size_elms ) ;
+            CheckPermutArr( mp16pma2 , m_Permutate.epma_size_elms ) ;
         #endif
 
-        m_Permutate.eRearrangePMA1( mpu16e_temp_block_pma , mppma2 ) ;
+        m_Permutate.eRearrangePMA1( m16e_temp_block_pma , mp16pma2 ) ;
         #ifdef DEBUG
-            CheckPermutArr( m_Permutate.e_array.get() , m_Permutate.epma_size_elms ) ;
+            CheckPermutArr( m_Permutate.m16e_arr , m_Permutate.epma_size_elms ) ;
         #endif
 
 
@@ -598,34 +554,34 @@ void GammaCryptImpl::EncryptBlock() noexcept
         // cout pma
         std::cout << "\n EncryptBlock : pma1 \n" ;
         for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
-            std::cout << mppma1[ i ] << ' ' ;
+            std::cout << mp16pma1[ i ] << ' ' ;
         std::cout << std::endl ;
 
         std::cout << "\n pma2 \n" ;
         for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
-            std::cout << mppma2[ i ] << ' ' ;
+            std::cout << mp16pma2[ i ] << ' ' ;
         std::cout << std::endl ;
         #endif // DBG_INFO_ENBLD
 
 
-        m_Permutate.eRearrange( (unsigned char*) params.p_dest , mc_temp_block , mppma1 , m_Permutate.epma_size_elms , m_block_size_bytes , m_perm_bytes ) ;
+        m_Permutate.eRearrange( (unsigned char*) params.p_dest , m8_temp_block , mp16pma1 , m_Permutate.epma_size_elms , m_block_size_bytes , m_perm_bytes ) ;
     #endif // PERMUTATE_ENBLD
     
     // ----------- XOR2 ------------
 
 // todo1 uncomment it
     #ifdef LFSR_ENBLD
-    ( *mpShift )( mpkeys2 ) ;
+    ( *mpShift )( mp32keys2 ) ;
     #endif // LFSR_ENBLD
 
     #ifdef DIFFUSION_ENBLD
         MakeDiffusion( params.p_dest ) ; 
-        MakeDiffusion( mpkeys2 ) ; // this is CONFUSION
+        MakeDiffusion( mp32keys2 ) ; // this is CONFUSION
     #endif
 
     #ifdef XOR_ENBLD
         for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-            params.p_dest[ i ] ^= mpkeys2[ i ] ;
+            params.p_dest[ i ] ^= mp32keys2[ i ] ;
     #endif // XOR_ENBLD
 
 }
@@ -642,21 +598,21 @@ void GammaCryptImpl::EncryptBlockOneThr( unsigned nthr , unsigned n_pass_thr  ) 
         #ifdef XOR_ENBLD
             for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
                 params.p_dest[ uidx + i ] =  params.p_source[ uidx + i ] 
-                                             ^ mpkeys1[ n_pass_thr * mNblocks * m_blk_sz_words + uidx + i]  ;
+                                             ^ mp32keys1[ n_pass_thr * mNblocks * m_blk_sz_words + uidx + i]  ;
 		#else
             for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
                 params.p_dest[ uidx + i ] =  params.p_source[ uidx + i ] ;
         #endif
 
         #ifdef DIFFUSION_ENBLD
-            //MakeDiffusion( mpkeys1 + n_pass_thr * mNblocks * m_blk_sz_words + uidx ) ; // this is CONFUSION
+            //MakeDiffusion( mp32keys1 + n_pass_thr * mNblocks * m_blk_sz_words + uidx ) ; // this is CONFUSION
             MakeDiffusion( params.p_dest + uidx ) ;
         #endif
         
         #ifdef XOR_ENBLD
             for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
                 params.p_dest[ uidx + i ] =  params.p_dest[ uidx + i ] 
-                                             ^ mpkeys1[ n_pass_thr * mNblocks * m_blk_sz_words + m_blk_sz_words + uidx + i]  ;
+                                             ^ mp32keys1[ n_pass_thr * mNblocks * m_blk_sz_words + m_blk_sz_words + uidx + i]  ;
 		#endif // XOR_ENBLD
 
 
@@ -664,8 +620,8 @@ void GammaCryptImpl::EncryptBlockOneThr( unsigned nthr , unsigned n_pass_thr  ) 
 
         #ifdef PERMUTATE_ENBLD
             m_Permutate.eRearrange( reinterpret_cast< unsigned char * >( params.p_dest + uidx )  
-                    , mc_temp_block + nthr * m_block_size_bytes
-                    , mppma1 + n_pass_thr * mNblocks * m_Permutate.epma_size_elms + nthr * m_blks_per_thr * params.epma_sz_elmnts + j * params.epma_sz_elmnts 
+                    , m8_temp_block + nthr * m_block_size_bytes
+                    , mp16pma1 + n_pass_thr * mNblocks * m_Permutate.epma_size_elms + nthr * m_blks_per_thr * params.epma_sz_elmnts + j * params.epma_sz_elmnts 
                     , params.epma_sz_elmnts , m_blk_sz_words * sizeof( unsigned) , m_perm_bytes ) ;
 
 //                // cout pma
@@ -673,7 +629,7 @@ void GammaCryptImpl::EncryptBlockOneThr( unsigned nthr , unsigned n_pass_thr  ) 
 //                std::unique_lock<std::mutex> locker(g_lockprint);
 //                m_dbg_ofs2 << "\n pma1  thread: " << nthr << " thr_n_pass: " << n_pass_thr << "\n" ;
 //                for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
-//                    m_dbg_ofs2 << *(i + mppma1 + n_pass_thr * mNblocks * m_Permutate.epma_size_elms
+//                    m_dbg_ofs2 << *(i + mp16pma1 + n_pass_thr * mNblocks * m_Permutate.epma_size_elms
 //                                 + nthr * m_blks_per_thr * params.epma_sz_elmnts + j * params.epma_sz_elmnts)
 //                        << ' ' ;
 //                m_dbg_ofs2 << std::endl ;
@@ -687,42 +643,12 @@ void GammaCryptImpl::EncryptBlockOneThr( unsigned nthr , unsigned n_pass_thr  ) 
         #endif
         #ifdef XOR_ENBLD
             for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-                params.p_dest[ uidx + i ] ^=  mpkeys2[ n_pass_thr * mNblocks * m_blk_sz_words + uidx + i]  ;
+                params.p_dest[ uidx + i ] ^=  mp32keys2[ n_pass_thr * mNblocks * m_blk_sz_words + uidx + i]  ;
 		#endif // XOR_ENBLD
     }
 
 }
 
-
-// MT - multithreading : obsolete
-void GammaCryptImpl::EncryptBlockMT( unsigned char * e_temp_block ) noexcept
-{
-//    unsigned n_cycles = mNblocks / m_hrdw_concr ;
-    
-//    params.e_temp_block = e_temp_block ;
-//    params.e_array = m_Permutate.e_array.get() ;
-//    params.e_array2 = m_Permutate.e_array2.get() ;
-//    params.epma_sz_elmnts = m_Permutate.epma_size_elms ;
-    
-//	EncryptBlockOneThr( params , nthr ) ;
-	
-//    if ( n_cycles )
-//    {
-//        std::vector<std::thread> threads;
-//        for ( unsigned j = 0 ; j < m_hrdw_concr ; ++j )
-//        {
-//            std::thread thr( &GammaCryptImpl::EncryptBlockOneThr , this , std::ref( params ) , j ) ; 
-//            threads.emplace_back( std::move( thr ) ) ;
-//        }
-//        for ( auto & thr : threads ) 
-//            thr.join();
-//    }
-//    else
-//    {
-//        ;
-//    }
-
-}
 
 void GammaCryptImpl::PreCalc( const unsigned n_pass )
 {
@@ -731,33 +657,33 @@ void GammaCryptImpl::PreCalc( const unsigned n_pass )
                 // ----------- KEY1 -----------
                 #ifdef XOR_ENBLD
                     if ( n_pass == 0 && i == 0 )
-                        memcpy( mpkeys1 , mp_block_random.get() , m_block_size_bytes ) ;
+                        memcpy( mp32keys1 , m32_block_random , m_block_size_bytes ) ;
                 #endif
 
                 #ifdef LFSR_ENBLD
-                    ( *mpShift )( mp_block_random.get() ) ;
+                    ( *mpShift )( m32_block_random ) ;
                 #endif
 
                 #ifdef DIFFUSION_ENBLD
-                    MakeDiffusion( mp_block_random.get() ) ; // this is CONFUSION
+                    MakeDiffusion( m32_block_random ) ; // this is CONFUSION
                 #endif
 
                 #ifdef XOR_ENBLD
-                    memcpy( mpkeys1 + n_pass * mNblocks * m_blk_sz_words + (i + 1) * m_blk_sz_words , mp_block_random.get() , m_block_size_bytes ) ;
+                    memcpy( mp32keys1 + n_pass * mNblocks * m_blk_sz_words + (i + 1) * m_blk_sz_words , m32_block_random , m_block_size_bytes ) ;
                 #endif
             
                 // ---------- PMA2, PMA1 ----------
                 #ifdef PERMUTATE_ENBLD
-                    eTransformPMA2( m_Permutate.e_array2.get() , m_Permutate.epma_size_elms , m_op ) ;
-                    memcpy( mppma2 + n_pass * mNblocks * m_Permutate.epma_size_elms + i * m_Permutate.epma_size_elms , m_Permutate.e_array2.get() , m_Permutate.epma_size_elms * sizeof( uint16_t ) ) ;
-                    m_Permutate.eRearrangePMA1( mpu16e_temp_block_pma , m_Permutate.e_array2.get() ) ;
-                    memcpy( mppma1 + n_pass * mNblocks * m_Permutate.epma_size_elms + i * m_Permutate.epma_size_elms , m_Permutate.e_array.get() , m_Permutate.epma_size_elms * sizeof( uint16_t ) ) ;
+                    eTransformPMA2( m_Permutate.m16e_arr2 , m_Permutate.epma_size_elms , m_op ) ;
+                    memcpy( mp16pma2 + n_pass * mNblocks * m_Permutate.epma_size_elms + i * m_Permutate.epma_size_elms , m_Permutate.m16e_arr2 , m_Permutate.epma_size_elms * sizeof( uint16_t ) ) ;
+                    m_Permutate.eRearrangePMA1( m16e_temp_block_pma , m_Permutate.m16e_arr2 ) ;
+                    memcpy( mp16pma1 + n_pass * mNblocks * m_Permutate.epma_size_elms + i * m_Permutate.epma_size_elms , m_Permutate.m16e_arr , m_Permutate.epma_size_elms * sizeof( uint16_t ) ) ;
                 #endif
 //				// cout pma
 //				//m_dbg_ofs1 << "\n pma1 n_pass: " << n_pass << "\n" ;
 //                m_dbg_ofs1 << "\n pma1  _________" << " ____n_pass: " << n_pass << "\n" ;
 //				for ( unsigned j = 0 ; j < m_Permutate.epma_size_elms ; j ++)
-//					m_dbg_ofs1 << *( j + mppma1 + n_pass * mNblocks * m_Permutate.epma_size_elms + i * m_Permutate.epma_size_elms)
+//					m_dbg_ofs1 << *( j + mp16pma1 + n_pass * mNblocks * m_Permutate.epma_size_elms + i * m_Permutate.epma_size_elms)
 //						<< ' ' ;
 //				m_dbg_ofs1 << std::endl;
 
@@ -765,15 +691,15 @@ void GammaCryptImpl::PreCalc( const unsigned n_pass )
                 // ----------- KEY2 ------------
 
                 #ifdef LFSR_ENBLD
-                    ( *mpShift )( mp_block_random.get() + offs_key2 / m_quantum_size ) ;
+                    ( *mpShift )( m32_block_random + offs_key2 / m_quantum_size ) ;
                 #endif
 
                 #ifdef DIFFUSION_ENBLD
-                    MakeDiffusion( mp_block_random.get() + offs_key2 / m_quantum_size ) ; // this is CONFUSION
+                    MakeDiffusion( m32_block_random + offs_key2 / m_quantum_size ) ; // this is CONFUSION
                 #endif
                 
                 #ifdef XOR_ENBLD
-                    memcpy( mpkeys2 + n_pass * mNblocks * m_blk_sz_words + i * m_blk_sz_words , mp_block_random.get() + offs_key2 / m_quantum_size , m_block_size_bytes ) ;
+                    memcpy( mp32keys2 + n_pass * mNblocks * m_blk_sz_words + i * m_blk_sz_words , m32_block_random + offs_key2 / m_quantum_size , m_block_size_bytes ) ;
                 #endif
 
             }
@@ -790,12 +716,12 @@ void GammaCryptImpl::GenKeyToFile()
 
     display_str("making permutation array...") ;
     // m_Permutate initializing is inside GammaCryptImpl::Initialize
-    m_Permutate.MakePermutArr( m_Permutate.e_array.get() , m_Permutate.mpc_randoms + m_block_size_bytes * 2 , m_Permutate.m_BIarray ) ;
-    m_Permutate.MakePermutArr( m_Permutate.e_array2.get() , m_Permutate.mpc_randoms + m_block_size_bytes * 2 + m_Permutate.m_BIarray.pma_size_bytes , m_Permutate.m_BIarray2 ) ;
+    m_Permutate.MakePermutArr( m_Permutate.m16e_arr , m_Permutate.mp8_randoms + m_block_size_bytes * 2 , m_Permutate.m_BIarray ) ;
+    m_Permutate.MakePermutArr( m_Permutate.m16e_arr2 , m_Permutate.mp8_randoms + m_block_size_bytes * 2 + m_Permutate.m_BIarray.pma_size_bytes , m_Permutate.m_BIarray2 ) ;
 
     #ifdef DEBUG
-        CheckPermutArr( m_Permutate.e_array.get() , m_Permutate.epma_size_elms ) ;
-        CheckPermutArr( m_Permutate.e_array2.get() , m_Permutate.epma_size_elms ) ;
+        CheckPermutArr( m_Permutate.m16e_arr , m_Permutate.epma_size_elms ) ;
+        CheckPermutArr( m_Permutate.m16e_arr2 , m_Permutate.epma_size_elms ) ;
     #endif
 
     m_header.source_file_size = 0 ;
@@ -832,7 +758,7 @@ void GammaCryptImpl::Encrypt()  // вот это и будет main_multithread
     m_ifs.seekg( 0 , std::ios::beg ) ;
 
     Initialize() ;
-        assert( mp_block_random != nullptr ) ;
+        assert( m32_block_random != nullptr ) ;
         
     //
     unsigned tail_size_bytes = m_header.source_file_size % m_block_size_bytes ;
@@ -853,7 +779,7 @@ void GammaCryptImpl::Encrypt()  // вот это и будет main_multithread
                 auto mcs1 = std::chrono::high_resolution_clock::now() ;
                 //
         mGenerateRandoms() ;
-        //GenerateRandoms( m_blk_sz_words * 2 + m_Permutate.m_BIarray.pma_size_bytes * 2 / m_quantum_size + tail_size_words , mp_block_random.get()  ) ;
+        //GenerateRandoms( m_blk_sz_words * 2 + m_Permutate.m_BIarray.pma_size_bytes * 2 / m_quantum_size + tail_size_words , mu32_block_random.get()  ) ;
                 // time mesaure
                 auto mcs2 = std::chrono::high_resolution_clock::now() ;
                 std::chrono::duration<double> mcs = mcs2 - mcs1 ;
@@ -868,8 +794,8 @@ void GammaCryptImpl::Encrypt()  // вот это и будет main_multithread
         // m_Permutate initializing is inside GammaCryptImpl::Initialize
         if ( ! mb_decrypting )
         {
-            m_Permutate.MakePermutArr( m_Permutate.e_array.get() , m_Permutate.mpc_randoms + m_block_size_bytes * 2 , m_Permutate.m_BIarray ) ;
-            m_Permutate.MakePermutArr( m_Permutate.e_array2.get() , m_Permutate.mpc_randoms + m_block_size_bytes * 2 + m_Permutate.m_BIarray.pma_size_bytes , m_Permutate.m_BIarray2 ) ;
+            m_Permutate.MakePermutArr( m_Permutate.m16e_arr , m_Permutate.mp8_randoms + m_block_size_bytes * 2 , m_Permutate.m_BIarray ) ;
+            m_Permutate.MakePermutArr( m_Permutate.m16e_arr2 , m_Permutate.mp8_randoms + m_block_size_bytes * 2 + m_Permutate.m_BIarray.pma_size_bytes , m_Permutate.m_BIarray2 ) ;
         }
     }
     
@@ -878,12 +804,12 @@ void GammaCryptImpl::Encrypt()  // вот это и будет main_multithread
         // cout pma
         std::cout << "\n pma1 \n " ;
         for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
-            std::cout << m_Permutate.e_array[ i ] << ' ' ;
+            std::cout << m_Permutate.m16e_arr[ i ] << ' ' ;
         std::cout << std::endl ;
 
         std::cout << "\n pma2 \n " ;
         for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
-            std::cout << m_Permutate.e_array2[ i ] << ' ' ;
+            std::cout << m_Permutate.m16e_arr2[ i ] << ' ' ;
         std::cout << std::endl ;
         #endif // DBG_INFO_ENBLD
 
@@ -898,18 +824,18 @@ void GammaCryptImpl::Encrypt()  // вот это и будет main_multithread
     DisplayInfo() ;
 
     //CRYPT ;
-        assert( mp_block_random != nullptr ) ;
-        assert( mp_block_source != nullptr ) ;
-        assert( mp_block_dest != nullptr ) ;
+        assert( m32_block_random != nullptr ) ;
+        assert( m32_block_source != nullptr ) ;
+        assert( m32_block_dest != nullptr ) ;
 
     display_str("crypting...") ;
 
     assert( m_hrdw_concr != 0 ) ;
     auto ce_temp_block = std::make_unique< unsigned char[] >( m_block_size_bytes * m_Threading.m_Nthr * 2 ) ; // for ePMA, c-char // * 2 для разных проходов многопоточности todo remove
-	mc_temp_block = ce_temp_block.get() ;
+	m8_temp_block = ce_temp_block.get() ;
 	
     auto u16e_temp_block_pma = std::make_unique< uint16_t[] >( m_Permutate.epma_size_elms * m_Threading.m_Nthr ) ; // for ePMA2
-	mpu16e_temp_block_pma = u16e_temp_block_pma.get() ;
+	m16e_temp_block_pma = u16e_temp_block_pma.get() ;
 
     unsigned bytes_read ;
     
@@ -923,16 +849,16 @@ void GammaCryptImpl::Encrypt()  // вот это и будет main_multithread
     if ( mb_multithread )
     {
         upkeys1 = std::make_unique< t_block >( (mNblocks + 1 ) * m_blk_sz_words * 2 ) ; // * 2 для разных проходов многопоточности
-        mpkeys1 = upkeys1.get() ;
+        mp32keys1 = upkeys1.get() ;
         
         upkeys2 = std::make_unique< t_block >( mNblocks * m_blk_sz_words * 2 ) ;
-        mpkeys2 = upkeys2.get() ;
+        mp32keys2 = upkeys2.get() ;
         
         uppma1 = std::make_unique< uint16_t[] >( mNblocks * m_Permutate.epma_size_elms * 2 ) ;
-        mppma1 = uppma1.get() ;
+        mp16pma1 = uppma1.get() ;
         
         uppma2 = std::make_unique< uint16_t[] >( mNblocks * m_Permutate.epma_size_elms * 2 ) ;
-        mppma2 = uppma2.get() ;
+        mp16pma2 = uppma2.get() ;
         
     }
    
@@ -942,11 +868,11 @@ void GammaCryptImpl::Encrypt()  // вот это и будет main_multithread
     
     if ( ! mb_multithread )
     {
-        mpbuffer = reinterpret_cast< char * > ( mp_block_source.get() ) ;
-        mpbuffout = reinterpret_cast< char * > ( mp_block_dest.get() ) ;
+        mpbuffer = reinterpret_cast< char * > ( m32_block_source ) ;
+        mpbuffout = reinterpret_cast< char * > ( m32_block_dest ) ;
         mbuf_size = m_block_size_bytes ;
-		params.p_source = mp_block_source.get() ;
-		params.p_dest = mp_block_dest.get() ;
+		params.p_source = m32_block_source ;
+		params.p_dest = m32_block_dest ;
     }
     else
     {
@@ -969,8 +895,8 @@ void GammaCryptImpl::Encrypt()  // вот это и будет main_multithread
     
     mNblocks = mbuf_size / m_block_size_bytes ;
 	
-    params.e_array = m_Permutate.e_array.get() ; // todo get out 
-    params.e_array2 = m_Permutate.e_array2.get() ; // todo get out
+    params.e16_arr = m_Permutate.m16e_arr ; // todo get out 
+    params.e16_arr2 = m_Permutate.m16e_arr2 ; // todo get out
     params.epma_sz_elmnts = m_Permutate.epma_size_elms ;
 
 	if ( mb_multithread )
@@ -978,10 +904,10 @@ void GammaCryptImpl::Encrypt()  // вот это и будет main_multithread
 		m_Threading.Process( this , m_Threading.m_Nthr ) ;
 	}
 	//даже если был multithread, заканчиваем однопоточно:
-    mpkeys1 = mp_block_random.get() ;
-    mpkeys2 = mp_block_random.get() + offs_key2 / m_quantum_size ;
-    mppma1 = m_Permutate.e_array.get() ;
-    mppma2 = m_Permutate.e_array2.get() ;
+    mp32keys1 = m32_block_random ;
+    mp32keys2 = m32_block_random + offs_key2 / m_quantum_size ;
+    mp16pma1 = m_Permutate.m16e_arr ;
+    mp16pma2 = m_Permutate.m16e_arr2 ;
 
     // GO!
 
@@ -1007,7 +933,7 @@ void GammaCryptImpl::Encrypt()  // вот это и будет main_multithread
 				assert( tail_size_read == tail_size_bytes ) ;
 				//mNblocks++ ;
 				// тогда остаток блока надо добить randoms[m_blk_sz_words*2] .. randoms[m_blk_sz_words*2 + tail_size_bytes]
-				memcpy( (char*) params.p_source + tail_size_read, /*reinterpret_cast< unsigned char * >*/ (unsigned char *) ( mp_block_random.get() ) + offs_ktail , m_block_size_bytes - tail_size_read ) ;
+				memcpy( (char*) params.p_source + tail_size_read, reinterpret_cast< unsigned char * >( m32_block_random ) + offs_ktail , m_block_size_bytes - tail_size_read ) ;
 			}
 			
 		}
@@ -1030,27 +956,27 @@ void GammaCryptImpl::Encrypt()  // вот это и будет main_multithread
 }
 
 
-inline void GammaCryptImpl::RemoveDiffusion( unsigned * pdst ) noexcept
+inline void GammaCryptImpl::RemoveDiffusion( unsigned * p32dst ) noexcept
 {
     for ( int j = 9 ; j >= 0 ; j-- )
     {
         // cycled shift right
         for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ ) // 38 bit rolls
             if ( j < 4 )
-                pdst[i] = ( pdst[i] >> 1 ) | ( pdst[i] << 31 ) ; // 6 rolls
+                p32dst[i] = ( p32dst[i] >> 1 ) | ( p32dst[i] << 31 ) ; // 6 rolls
             else if ( j == 4 )
-                pdst[i] = ( pdst[i] >> 4 ) | ( pdst[i] << 28 ) ; // 4 rolls
+                p32dst[i] = ( p32dst[i] >> 4 ) | ( p32dst[i] << 28 ) ; // 4 rolls
             else if ( j == 5 )
-                pdst[i] = ( pdst[i] >> 2 ) | ( pdst[i] << 30 ) ; // 2 rolls
+                p32dst[i] = ( p32dst[i] >> 2 ) | ( p32dst[i] << 30 ) ; // 2 rolls
             else if ( j == 7 )
-                pdst[i] = ( pdst[i] >> 5 ) | ( pdst[i] << 27 ) ; // 5 rolls
+                p32dst[i] = ( p32dst[i] >> 5 ) | ( p32dst[i] << 27 ) ; // 5 rolls
             else if ( j == 8 &&  ( i % 2 == 0 ) )
-                pdst[i] = ( pdst[i] << 16 ) | ( pdst[i] >> 16 ) ; // 15 rolls
+                p32dst[i] = ( p32dst[i] << 16 ) | ( p32dst[i] >> 16 ) ; // 15 rolls
         //arithmetic manipulations
-        pdst[ 0 ] -= pdst[ m_blk_sz_words - 1 ] ;
+        p32dst[ 0 ] -= p32dst[ m_blk_sz_words - 1 ] ;
         for ( unsigned i = m_blk_sz_words -1 ; i > 0 ; i-- )
         {
-            pdst[ i ] -= pdst[ i - 1 ] ;
+            p32dst[ i ] -= p32dst[ i - 1 ] ;
         }
     }
 
@@ -1059,109 +985,109 @@ inline void GammaCryptImpl::RemoveDiffusion( unsigned * pdst ) noexcept
 //    {
 //        // cycled shift right
 //        for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-//            pdst[ i ] = ( pdst[ i ] >> 1 ) | ( pdst[ i ] << 31 ) ;
+//            p32dst[ i ] = ( p32dst[ i ] >> 1 ) | ( p32dst[ i ] << 31 ) ;
 //        //arithmetic manipulations
-//        pdst[ 0 ] -= pdst[ m_blk_sz_words - 1 ] ;
+//        p32dst[ 0 ] -= p32dst[ m_blk_sz_words - 1 ] ;
 //        for ( unsigned i = m_blk_sz_words -1 ; i > 0 ; i-- )
 //        {
-//            pdst[ i ] -= pdst[ i - 1 ] ;
+//            p32dst[ i ] -= p32dst[ i - 1 ] ;
 //        }
 //    }
 }
 
 
-
-void GammaCryptImpl::DecryptBlock( uint16_t * t_invs_pma1 ) noexcept
+void GammaCryptImpl::DecryptBlock( uint16_t * t16_invs_pma1 ) noexcept
 {
     // -------------- XOR2 --------------
     #ifdef LFSR_ENBLD
-    ( *mpShift )( mp_block_random.get() + m_blk_sz_words ) ;
+    ( *mpShift )( m32_block_random + m_blk_sz_words ) ;
     #endif
     
     #ifdef DIFFUSION_ENBLD
-        MakeDiffusion( mp_block_random.get() + m_blk_sz_words ) ; // this is CONFUSION
+        MakeDiffusion( m32_block_random + m_blk_sz_words ) ; // this is CONFUSION
     #endif
     
     //todo1 Uncomment !
     #ifdef XOR_ENBLD
         for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-            mp_block_source[i] = mp_block_source[i] ^ mp_block_random[ i + offs_key2 / m_quantum_size ] ;
+            m32_block_source[i] = m32_block_source[i] ^ m32_block_random[ i + offs_key2 / m_quantum_size ] ;
     #endif // XOR_ENBLD
         
     #ifdef DIFFUSION_ENBLD
-        RemoveDiffusion( mp_block_source.get() ) ;
+        RemoveDiffusion( m32_block_source ) ;
     #endif
     
 
     // -------------- REPOSITIONING --------------
     #ifdef PERMUTATE_ENBLD
         // transform pma2
-        eTransformPMA2( m_Permutate.e_array2.get() , m_Permutate.epma_size_elms , m_op ) ;
+        eTransformPMA2( m_Permutate.m16e_arr2 , m_Permutate.epma_size_elms , m_op ) ;
 
         //rearrange pma1
-        m_Permutate.eRearrangePMA1( mpu16e_temp_block_pma , m_Permutate.e_array2.get() ) ;
+        m_Permutate.eRearrangePMA1( m16e_temp_block_pma , m_Permutate.m16e_arr2 ) ;
 
 
         #ifdef DBG_INFO_ENBLD
         // cout pma
         std::cout << "\n Decrypt block: pma1 \n" ;
         for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
-            std::cout << m_Permutate.e_array[ i ] << ' ' ;
+            std::cout << m_Permutate.m16e_arr[ i ] << ' ' ;
         std::cout << std::endl ;
 
         std::cout << "\n pma2 \n" ;
         for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
-            std::cout << m_Permutate.e_array2[ i ] << ' ' ;
+            std::cout << m_Permutate.m16e_arr2[ i ] << ' ' ;
         std::cout << std::endl ;
         #endif // DBG_INFO_ENBLD
 
 
         //inverse pma1
-        m_Permutate.InverseExpPermutArr( t_invs_pma1 , m_Permutate.e_array.get() ) ;
+        m_Permutate.InverseExpPermutArr( t16_invs_pma1 , m_Permutate.m16e_arr ) ;
 
         #ifdef DBG_INFO_ENBLD
         // cout pma
         std::cout << "\n After inverse: pma1 \n" ;
         for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
-            std::cout << t_invs_pma1[ i ] << ' ' ;
+            std::cout << t16_invs_pma1[ i ] << ' ' ;
         std::cout << std::endl ;
         #endif
         //permutate
-        m_Permutate.eRearrange( ( unsigned char*) mp_block_source.get() , mc_temp_block , t_invs_pma1
+        m_Permutate.eRearrange( ( unsigned char*) m32_block_source , m8_temp_block , t16_invs_pma1
                 , m_Permutate.epma_size_elms , m_block_size_bytes , m_perm_bytes ) ;
     #endif // PERMUTATE_ENBLD
     
     // -------------- XOR1 --------------
     #ifdef XOR_ENBLD
-        memcpy( mc_temp_block , mp_block_random.get() , m_block_size_bytes ) ;
+        memcpy( m8_temp_block , m32_block_random , m_block_size_bytes ) ;
     #endif
     
     #ifdef LFSR_ENBLD
-        ( *mpShift )( mp_block_random.get() ) ;
+        ( *mpShift )( m32_block_random ) ;
     #endif // LFSR_ENBLD
 
     #ifdef DIFFUSION_ENBLD
-        MakeDiffusion( mp_block_random.get() ) ; // this is CONFUSION
+        MakeDiffusion( m32_block_random ) ; // this is CONFUSION
     #endif
 
     #ifdef XOR_ENBLD
         for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-            mp_block_dest[i] = mp_block_source[i] ^ mp_block_random[i] ; // todo1 Uncomment it!!!!
+            m32_block_dest[i] = m32_block_source[i] ^ m32_block_random[i] ; // todo1 Uncomment it!!!!
     #else
         for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-            mp_block_dest[i] = mp_block_source[i] ;
+            m32_block_dest[i] = m32_block_source[i] ;
     #endif // XOR_ENBLD
     
     #ifdef DIFFUSION_ENBLD
-        RemoveDiffusion( mp_block_dest.get() ) ;
+        RemoveDiffusion( m32_block_dest ) ;
     #endif
 
     #ifdef XOR_ENBLD
         for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-            mp_block_dest[i] = mp_block_dest[i] ^ ( (unsigned * ) (mc_temp_block) )[ i ] ; // todo1 Uncomment it!!!!
+            m32_block_dest[i] = m32_block_dest[i] ^ ( (unsigned * ) (m8_temp_block) )[ i ] ; // todo1 Uncomment it!!!!
     #endif
     
 }
+
 
 
 void GammaCryptImpl::Decrypt()
@@ -1203,27 +1129,27 @@ void GammaCryptImpl::Decrypt()
         // cout pma
         std::cout << "\n pma1 \n" ;
         for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
-            std::cout << m_Permutate.e_array[ i ] << ' ' ;
+            std::cout << m_Permutate.m16e_arr[ i ] << ' ' ;
         std::cout << std::endl ;
 
         std::cout << "\n pma2 \n" ;
         for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
-            std::cout << m_Permutate.e_array2[ i ] << ' ' ;
+            std::cout << m_Permutate.m16e_arr2[ i ] << ' ' ;
         std::cout << std::endl ;
         #endif // DBG_INFO_ENBLD
 
     DisplayInfo() ;
     
     // CRYPT  Crypt() ;
-        assert( mp_block_random != nullptr ) ;
-        assert( mp_block_source != nullptr ) ;
-        assert( mp_block_dest != nullptr ) ;
+        assert( m32_block_random != nullptr ) ;
+        assert( m32_block_source != nullptr ) ;
+        assert( m32_block_dest != nullptr ) ;
 
-    auto temp_block = std::make_unique< unsigned char[] >( m_block_size_bytes ) ; // for PMA
-    mc_temp_block = temp_block.get() ;
-    //auto e_temp_block = std::make_unique< unsigned char[] >( m_block_size_bytes ) ; // for ePMA
-    auto e_temp_block_pma = std::make_unique< uint16_t[] >( m_Permutate.epma_size_elms ) ; // for ePMA2
-    mpu16e_temp_block_pma = e_temp_block_pma.get() ;
+    auto temp_block = std::make_unique< unsigned char[] >( m_block_size_bytes ) ; // for Rearrange with PMA
+    m8_temp_block = temp_block.get() ;
+    //auto e8_temp_block = std::make_unique< unsigned char[] >( m_block_size_bytes ) ; // for ePMA
+    auto u16e_temp_block_pma = std::make_unique< uint16_t[] >( m_Permutate.epma_size_elms ) ; // for ePMA2
+    m16e_temp_block_pma = u16e_temp_block_pma.get() ;
     
     auto t_invs_pma1 = std::make_unique< uint16_t[] >( m_Permutate.epma_size_elms ) ;
 
@@ -1238,7 +1164,7 @@ void GammaCryptImpl::Decrypt()
     while ( i > 0 )
     {
         // READING
-        m_ifs.read( (char*) mp_block_source.get(), m_block_size_bytes ) ;
+        m_ifs.read( (char*) m32_block_source, m_block_size_bytes ) ;
         unsigned bytes_read = m_ifs.gcount() ;
         if ( bytes_read == 0 )
             break ;
@@ -1262,7 +1188,7 @@ void GammaCryptImpl::Decrypt()
             bytes_to_write = m_header.tail_size ;
              */
         //OUT
-        m_ofs.write( (char*) mp_block_dest.get() , bytes_to_write ) ;
+        m_ofs.write( reinterpret_cast< char* >( m32_block_dest ) , bytes_to_write ) ;
 
     }
             // time mesaure
@@ -1273,175 +1199,6 @@ void GammaCryptImpl::Decrypt()
             //
 }
 
-
-
-// в разработке многопоточная:
-/*
-void GammaCryptImpl::Decrypt()
-{
-    ReadHead( m_ifs ) ;
-    
-    m_block_size_bytes = m_header.h_block_size ;
-    mb_decrypting = true ;
-    mb_need_init_blocksize = false ;
-    
-    Initialize() ;
-
-    MakePswBlock() ;
-
-    ReadOverheadData() ;
-    
-        #ifdef DBG_INFO_ENBLD
-        // cout pma
-        std::cout << "\n pma1 \n" ;
-        for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
-            std::cout << m_Permutate.e_array[ i ] << ' ' ;
-        std::cout << std::endl ;
-
-        std::cout << "\n pma2 \n" ;
-        for ( unsigned i = 0 ; i < m_Permutate.epma_size_elms ; i ++)
-            std::cout << m_Permutate.e_array2[ i ] << ' ' ;
-        std::cout << std::endl ;
-        #endif // DBG_INFO_ENBLD
-
-    DisplayInfo() ;
-    
-    // CRYPT  Crypt() ;
-        assert( mp_block_random != nullptr ) ;
-        assert( mp_block_source != nullptr ) ;
-        assert( mp_block_dest != nullptr ) ;
-
-    auto temp_block = std::make_unique< unsigned char[] >( m_block_size_bytes ) ; // for PMA
-    //auto e_temp_block = std::make_unique< unsigned char[] >( m_block_size_bytes ) ; // for ePMA
-    auto e_temp_block_pma = std::make_unique< uint16_t[] >( m_Permutate.epma_size_elms ) ; // for ePMA2
-    
-    auto t_invs_pma1 = std::make_unique< uint16_t[] >( m_Permutate.epma_size_elms ) ;
-
-            // time mesaure
-            auto mcs1 = std::chrono::high_resolution_clock::now() ;
-            //
-
-    auto ce_temp_block = std::make_unique< unsigned char[] >( m_block_size_bytes * m_Threading.m_Nthr) ; // for ePMA
-	mce_temp_block = ce_temp_block.get() ;
-    auto u16e_temp_block_pma = std::make_unique< uint16_t[] >( m_Permutate.epma_size_elms * m_Threading.m_Nthr ) ; // for ePMA2
-
-    // prepair to calculate all key1, key2 , pma1 , pma2
-    unsigned n_blocks = m_Threading.m_Nthr * m_blks_per_thr ;
-    mbuf_size = m_block_size_bytes * n_blocks ;
-    
-    unsigned * pkeys1 = nullptr , * pkeys2 = nullptr ;
-    uint16_t * ppma1 = nullptr , * ppma2 = nullptr ;
-    
-    if ( mb_multithread )
-    {
-        m_upkeys1 = std::make_unique< t_block >( n_blocks * m_blk_sz_words ) ;
-        pkeys1 = m_upkeys1.get() ;
-        
-        m_upkeys2 = std::make_unique< t_block >( n_blocks * m_blk_sz_words ) ;
-        pkeys2 = m_upkeys2.get() ;
-        
-        m_uppma1 = std::make_unique< uint16_t[] >( n_blocks * m_Permutate.epma_size_elms ) ;
-        ppma1 = m_uppma1.get() ;
-        
-        m_uppma2 = std::make_unique< uint16_t[] >( n_blocks * m_Permutate.epma_size_elms ) ;
-        ppma2 = m_uppma2.get() ;
-        
-    }
-
-   
-    std::unique_ptr< char[] > upbuffer ; // up - Unique Ptr
-
-    std::unique_ptr< char[] > upbuffout ; // up - Unique Ptr
-    char * mpbuffout ;
-    
-    if ( ! mb_multithread )
-    {
-        mpbuffer = reinterpret_cast< char * > ( mp_block_source.get() ) ;
-        mpbuffout = reinterpret_cast< char * > ( mp_block_dest.get() ) ;
-        mbuf_size = m_block_size_bytes ;
-    }
-    else
-    {
-        upbuffer = std::make_unique< char[] >( mbuf_size ) ;
-        mpbuffer = upbuffer.get() ;
-
-        upbuffout = std::make_unique< char[] >( mbuf_size ) ;
-        mpbuffout = upbuffout.get() ;
-        
-        params.p_source = reinterpret_cast< unsigned * >( mpbuffer ) ;
-        params.p_dest = reinterpret_cast< unsigned * >( mpbuffout ) ;
-    }
-
-
-    // operation for eTransformPMA2
-    unsigned op = 0 ;
-    
-    int64_t i = m_header.source_file_size ;
-    while ( i > 0 )
-    {
-        // READING
-        m_ifs.read(  mpbuffer , mbuf_size ) ;
-        unsigned bytes_read = m_ifs.gcount() ;
-        if ( bytes_read == 0 )
-            break ;
-        
-        n_blocks = bytes_read / m_block_size_bytes ;
-
-
-        // calculate all key1, key2 , pma1 , pma2
-        if ( mb_multithread )
-        {
-            for ( unsigned i = 0 ; i < n_blocks ; ++i )
-            {
-                // ----------- KEY1 -----------
-                ( *mpShift )( mp_block_random.get() ) ;
-                //memcpy( m_vkey1[ i ] , mp_block_random.get() , m_block_size_bytes ) ;
-                memcpy( pkeys1 + i * m_blk_sz_words , mp_block_random.get() , m_block_size_bytes ) ;
-            
-                // ---------- PMA2, PMA1 ----------
-                eTransformPMA2( m_Permutate.e_array2.get() , m_Permutate.epma_size_elms , op ) ;
-                memcpy( ppma2 + i * m_Permutate.epma_size_elms , m_Permutate.e_array2.get() , m_Permutate.epma_size_elms * sizeof( uint16_t ) ) ;
-                m_Permutate.eRearrangePMA1( u16e_temp_block_pma.get() , m_Permutate.e_array2.get() ) ;
-                memcpy( ppma1 + i * m_Permutate.epma_size_elms , m_Permutate.e_array.get() , m_Permutate.epma_size_elms * sizeof( uint16_t ) ) ;
-                
-                // ----------- KEY2 ------------
-                ( *mpShift )( mp_block_random.get() + offs_key2 / m_quantum_size ) ;
-                memcpy( pkeys2 + i * m_blk_sz_words , mp_block_random.get() + offs_key2 / m_quantum_size , m_block_size_bytes ) ;
-
-            }
-        }
-
-
-        if ( mb_multithread )
-            EncryptBlockMT( u16e_temp_block_pma.get() , mce_temp_block , n_blocks ) ;
-        else
-            EncryptBlock( u16e_temp_block_pma.get() , ce_temp_block.get() , op ) ;
-        
-        //it should not be the tail now
-        // checking tail size
-        unsigned bytes_to_write ;
-        i -= m_block_size_bytes ;
-        if ( i >=0 )
-            bytes_to_write = bytes_read ;
-        else
-        {
-            //assert( false ) ;
-            bytes_to_write = i + m_block_size_bytes ;
-        }
-
-        //OUT
-        //m_ofs.write( (char*) mp_block_dest.get() , bytes_to_write ) ;
-        m_ofs.write( (char*) mpbuffout , mbuf_size ) ;
-
-    }
-            // time mesaure
-            auto mcs2 = std::chrono::high_resolution_clock::now() ;
-            std::chrono::duration<double> mcs = mcs2 - mcs1 ;
-            uint64_t drtn = mcs.count() * 1000000 ;
-            std::cout << "Duration: " << drtn << std::endl ;
-            //
-}
-*/
 
 void GammaCryptImpl::ReadHead( std::istream & ifs )
 {
@@ -1455,8 +1212,8 @@ void GammaCryptImpl::ReadHead( std::istream & ifs )
 
 void GammaCryptImpl::ReadOverheadData( std::istream & ifs )
 {
-        assert( mp_block_random != nullptr ) ;
-        assert( mp_block_password != nullptr ) ;
+        assert( m32_block_random != nullptr ) ;
+        assert( m32_block_password != nullptr ) ;
     //Block_key
     auto block_key = std::make_unique< t_block >( m_blk_sz_words );
     //Key1
@@ -1465,7 +1222,7 @@ void GammaCryptImpl::ReadOverheadData( std::istream & ifs )
         throw ("error: File too short, missing key block") ;
 
     for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-        mp_block_random[i] = block_key[i] ^ mp_block_password[i] ; // todo1 Uncomment it!!!!
+        m32_block_random[i] = block_key[i] ^ m32_block_password[i] ; // todo1 Uncomment it!!!!
 
 
     //Key2
@@ -1474,7 +1231,7 @@ void GammaCryptImpl::ReadOverheadData( std::istream & ifs )
         throw ("error: File too short, missing key2 block") ;
 
     for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-        mp_block_random[ i + offs_key2 / m_quantum_size ] = block_key[i] ^ mp_block_password[i] ;
+        m32_block_random[ i + offs_key2 / m_quantum_size ] = block_key[i] ^ m32_block_password[i] ;
 
     // Permutation Array 1
     ifs.read( (char*) m_Permutate.m_BIarray.m_array.get() , m_Permutate.m_BIarray.pma_size_bytes ) ;
@@ -1492,12 +1249,12 @@ void GammaCryptImpl::ReadOverheadData( std::istream & ifs )
     //m_Permutate.InversePermutArr( m_Permutate.m_BIarray ) ;
     
     // build e_array, aka Expanded in the memory
-    for ( uint16_t i = 0 ; i < m_Permutate.m_BIarray.max_index ; ++i )
+    for ( uint16_t i = 0 ; i < m_Permutate.m_BIarray.m_size_elms ; ++i )
     {
-        m_Permutate.e_array.get()[ i ] = m_Permutate.m_BIarray[ i ] ;
+        m_Permutate.m16e_arr[ i ] = m_Permutate.m_BIarray[ i ] ;
     }
 	#ifdef DEBUG
-		CheckPermutArr( m_Permutate.e_array.get() , m_Permutate.epma_size_elms ) ;
+		CheckPermutArr( m_Permutate.m16e_arr , m_Permutate.epma_size_elms ) ;
 	#endif
 
 
@@ -1516,21 +1273,21 @@ void GammaCryptImpl::ReadOverheadData( std::istream & ifs )
 
     //m_Permutate.InversePermutArr( m_Permutate.m_BIarray2 ) ;
     
-    // build e_array, aka Expanded in the memory
-    for ( uint16_t i = 0 ; i < m_Permutate.m_BIarray2.max_index ; ++i )
+    // build e_array2, aka Expanded in the memory
+    for ( uint16_t i = 0 ; i < m_Permutate.m_BIarray2.m_size_elms ; ++i )
     {
-        m_Permutate.e_array2.get()[ i ] = m_Permutate.m_BIarray2[ i ] ; // todo get out get()
+        m_Permutate.m16e_arr2[ i ] = m_Permutate.m_BIarray2[ i ] ; // todo get out get()
     }
 	#ifdef DEBUG
-		CheckPermutArr( m_Permutate.e_array2.get() , m_Permutate.epma_size_elms ) ;
+		CheckPermutArr( m_Permutate.m16e_arr2 , m_Permutate.epma_size_elms ) ;
 	#endif
 
 } ;
 
 void GammaCryptImpl::WriteHead()
 {
-        assert( mp_block_random != nullptr ) ;
-        assert( mp_block_password != nullptr ) ;
+        assert( m32_block_random != nullptr ) ;
+        assert( m32_block_password != nullptr ) ;
     if ( mb_use_keyfile )
     {
         // set high bit of m_header.major_ver :
@@ -1553,11 +1310,11 @@ void GammaCryptImpl::WriteHead()
         auto block_key = std::make_unique< t_block >( m_blk_sz_words );
         //Key1
         for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-            block_key[i] = mp_block_random[i] ^ mp_block_password[i] ;
+            block_key[i] = m32_block_random[i] ^ m32_block_password[i] ;
         m_ofs.write( (char*) block_key.get() , m_block_size_bytes ) ;
         //Key2
         for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-            block_key[i] = mp_block_random[ i + offs_key2 / m_quantum_size ] ^ mp_block_password[i] ;
+            block_key[i] = m32_block_random[ i + offs_key2 / m_quantum_size ] ^ m32_block_password[i] ;
         m_ofs.write( (char*) block_key.get() , m_block_size_bytes ) ;
 
         
@@ -1583,18 +1340,13 @@ void GammaCryptImpl::WriteHead()
     }
 }
 
-void GammaCryptImpl::PMA_Xor_Psw( unsigned * p_pma_in , unsigned * p_pma_out )
+void GammaCryptImpl::PMA_Xor_Psw( unsigned * p32_pma_in , unsigned * p32_pma_out )
 {
     for ( unsigned i = 0 ; i < m_Permutate.m_BIarray.pma_size_bytes / m_quantum_size ; ++i  )
     {
-        p_pma_out[ i ] = p_pma_in[ i ] ^ reinterpret_cast< unsigned * >( mpc_block_psw_pma.get() )[ i ]   ;
+        p32_pma_out[ i ] = p32_pma_in[ i ] ^ reinterpret_cast< unsigned * >( m8_block_psw_pma.get() )[ i ]   ;
     }
     
-} ;
-
-//obsolete:
-void GammaCryptImpl::Crypt()
-{ ;
 } ;
 
 
@@ -1630,7 +1382,7 @@ void GammaCryptImpl::mGenerateRandoms()
 
     try
     {
-        GenerateRandoms( m_rnd_size_words , mp_block_random.get() , std::ref( ticks ) ) ;
+        GenerateRandoms( m_rnd_size_words , m32_block_random , std::ref( ticks ) ) ;
     }
     catch( const char * s)
     {
@@ -1657,7 +1409,7 @@ void GammaCryptImpl::mGenerateRandoms()
     std::generate(begin(vec), end(vec), gen);
     
     for ( unsigned i = 0 ; i < m_rnd_size_words ; ++ i )
-        mp_block_random[ i ] ^= vec[ i ] ;
+        m32_block_random[ i ] ^= vec[ i ] ;
 }
 
 void GammaCryptImpl::DisplayInfo()
@@ -1666,7 +1418,7 @@ void GammaCryptImpl::DisplayInfo()
     oss << "\n source file size (bytes): " << m_header.source_file_size ;
     oss << "\n block size (bytes): " << m_block_size_bytes ;
     oss << "\n permutation array size (bytes): " << m_Permutate.m_BIarray.pma_size_bytes ;
-    oss << "\n number of permutation array elements: " << m_Permutate.m_BIarray.max_index ;
+    oss << "\n number of permutation array elements: " << m_Permutate.m_BIarray.m_size_elms ;
     oss << "\n size of one permutation array element (bits): " << m_Permutate.m_BIarray.index_size_bits ;
     oss << "\n hardware_concurrency: " << m_hrdw_concr ;
     oss << "\n" ;

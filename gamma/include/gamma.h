@@ -23,7 +23,7 @@ struct ParamsForCryBl
 {
     ParamsForCryBl() {} ;
     //uint16_t * e_temp_block_pma ;
-    //unsigned char * e_temp_block ;
+    //unsigned char * e8_temp_block ;
     //unsigned hardware_concurrency ;
     //unsigned n_blocks ;
     unsigned * p_source ;
@@ -35,8 +35,8 @@ struct ParamsForCryBl
 
     //unsigned blk_sz_words ;
     //unsigned blks_per_thr ;
-    uint16_t * e_array ;
-    uint16_t * e_array2 ;
+    uint16_t * e16_arr ;
+    uint16_t * e16_arr2 ;
     unsigned blk_sz_bytes ;
     unsigned epma_sz_elmnts ;
 } ;
@@ -111,8 +111,6 @@ private:
     char * mpbuffer ;
     char * mpbuffout ;
 	unsigned mbuf_size ;
-    // MT- multithread
-    void EncryptBlockMT( unsigned char * e_temp_block ) noexcept ;
 
 	void EncryptBlockOneThr( unsigned Nthr , unsigned n_pass_thr ) noexcept ;
 
@@ -120,7 +118,7 @@ private:
     unsigned m_tail_size_words ;
     unsigned m_tail_size_bytes ;
 
-	unsigned char * mc_temp_block ;
+	unsigned char * m8_temp_block ;
 	
     struct t_header
     {
@@ -142,49 +140,47 @@ private:
         uint16_t reserved2 = 0 ;
     } m_header ; 
 
-    size_t m_block_size_bytes = 64 ;    // in bytes , further calculated in Initialize method, deponds on file size
     bool mb_multithread = false ;
+    unsigned m_block_size_bytes = 64 ;    // in bytes , further calculated in Initialize method, deponds on file size
 
     // block random
     // N = m_blk_sz_words / 4 
     // offset in bytes:
     //    KEY1           KEY2                PMA1                             PMA2                         tail KEY
     // 0  ... N-1   N  ...  N*2-1   N*2...N*2+PMAsizeBytes-1   N*2+PMAsizeBytes...N*2+PMAsizeBytes*2-1    N*2+PMAsizeBytes*2 ... N*2+PMAsizeBytes*2+tailSize-1
-    std::unique_ptr< t_block > mp_block_random ; // mp_...   m - member, p - pointer
-    //obsolete: std::unique_ptr< t_block > mp_block_random3 ;
+    std::unique_ptr< t_block > mu32_block_random ; // mp_...   m - member, uqp - unique ptr , 32 - of 4 bytes elements
+    uint32_t * m32_block_random ;
     
-    unsigned offs_ktail ;
-//private:    
     //offsets bytes:
     unsigned offs_key2 ;
     unsigned offs_pma1 ;
     unsigned offs_pma2 ;
+    unsigned offs_ktail ;
 
     bool mb_need_init_blocksize = true ; // for if block_size specified in command line or for decrypt
     bool mb_decrypting = false ;
     const unsigned m_blks_per_thr = 1*8*1024 ; // if the block size is 128 bytes, this is 1 MB per thread, not counting memory for PreCalc()
     
-    unsigned * mpkeys1 = nullptr , * mpkeys2 = nullptr ; // m-member, p-pointer
-    uint16_t * mppma1 = nullptr , * mppma2 = nullptr ; // m-member, p-pointer
-	uint16_t * mpu16e_temp_block_pma ; // m-member, p-pointer to u16-uint16_t, e - expanded
+    unsigned * mp32keys1 = nullptr , * mp32keys2 = nullptr ; // m-member, p-pointer
+    uint16_t * mp16pma1 = nullptr , * mp16pma2 = nullptr ; // m-member, p-pointer
+	uint16_t * m16e_temp_block_pma ; // m-member, p-pointer to u16-uint16_t, e - expanded
 	unsigned mNblocks ; // number of blocks
 	unsigned m_op ; // operation for TransformPMA2
 	
 	Threading m_Threading ;
 
-    inline void MakeDiffusion( unsigned * psrc ) noexcept ;
-    inline void MakeConfusion( unsigned * psrc ) noexcept ;
-    inline void RemoveDiffusion( unsigned * psrc ) noexcept ;
+    inline void MakeDiffusion( unsigned * p32src ) noexcept ;
+    inline void RemoveDiffusion( unsigned * p32src ) noexcept ;
     //inline void RemoveConfusion( unsigned * psrc ) noexcept ;
             
     void EncryptBlock() noexcept ;
 
-    void DecryptBlock( uint16_t * t_invs_pma1 ) noexcept ;
+    void DecryptBlock( uint16_t * t16_invs_pma1 ) noexcept ;
 
 
     unsigned m_hrdw_concr ;
 
-    static const size_t m_quantum_size = sizeof ( unsigned) ; // block size of one calculating operation (probably 32 or 64 bit) 
+    static const size_t m_quantum_size = sizeof ( uint32_t ) ; // block size of one calculating operation (probably 32 or 64 bit) 
                                             // размер блока одной вычислительной операции (наверняка 32 или 64 бита)
     size_t m_blk_sz_words = m_block_size_bytes / m_quantum_size ;
     
@@ -198,21 +194,20 @@ private:
     //read keys, pma etc.
     void ReadOverheadData( std::istream & ifs ) ;
 
-    //obsolete:
-    // actually crypt algorythm
-    // called from Encrypt(), Decrypt()
-    void Crypt() ;
-    
     const std::string & m_password ;
     
-    std::unique_ptr< t_block > mp_block_password ;
-    std::unique_ptr< unsigned char[] > mpc_block_psw_pma ; // c - char
-    std::unique_ptr< t_block > mp_block_source ;
-    std::unique_ptr< t_block > mp_block_dest ;
+    std::unique_ptr< t_block > mu32_block_password ;
+    std::unique_ptr< unsigned char[] > m8_block_psw_pma ; // c - char
+    std::unique_ptr< t_block > mu32_block_source ;
+    std::unique_ptr< t_block > mu32_block_dest ;
+    
+    uint32_t * m32_block_password = nullptr ;
+    uint32_t * m32_block_source = nullptr ;
+    uint32_t * m32_block_dest = nullptr ;
     
     Permutate m_Permutate ;
 
-    void PMA_Xor_Psw( unsigned * p_pma_in , unsigned * p_pma_out ) ;
+    void PMA_Xor_Psw( unsigned * p32_pma_in , unsigned * p32_pma_out ) ;
     
     void DisplayInfo() ;
     
