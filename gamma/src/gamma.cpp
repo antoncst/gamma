@@ -461,11 +461,38 @@ void GammaCryptImpl::MakePswBlock()
 
 inline void GammaCryptImpl::MakeDiffusion( unsigned * p32src) noexcept
 {
-//    memcpy( m8_temp_block , p32src , m_block_size_bytes ) ;
-//    //для удобства:
-//    p32src = m8_temp_block ;
-    
-    for ( unsigned j = 0 ; j <= 9 ; j++ )
+
+	uint64_t * p64src = reinterpret_cast< uint64_t * >( p32src ) ; 
+
+    for ( unsigned j = 0 ; j <= 11 ; j++ )
+    {
+        //arithmetic manipulations
+        for ( unsigned i = 1 ; i < m_blk_sz_words / 2 ; i++ ) // /2 because of uint64_t
+        {
+            p64src[ i ] += p64src[ i - 1 ] ;
+        }
+        p64src[ 0 ] += p64src[ m_blk_sz_words/2 - 1 ] ;
+
+        // left circular shift
+        for ( unsigned i = 0 ; i < m_blk_sz_words / 2 ; i++ ) // 32 bit rolls
+            if ( j < 4 )
+                p64src[i] = ( p64src[i] << 1 ) | ( p64src[i] >> 63 ) ; // 6 rolls
+            else if ( j == 4 )
+                p64src[i] = ( p64src[i] << 4 ) | ( p64src[i] >> 60 ) ; // 4 rolls
+            else if ( j == 5 )
+                p64src[i] = ( p64src[i] << 2 ) | ( p64src[i] >> 62 ) ; // 2 rolls
+            else if ( j == 7 )
+                p64src[i] = ( p64src[i] << 5 ) | ( p64src[i] >> 59 ) ; // 5 rolls
+            else if ( j == 8 &&  ( i % 2 == 0 ) )
+                p64src[i] = ( p64src[i] << 16 ) | ( p64src[i] >> 48 ) ; // 15 rolls
+            else if ( j == 9 &&  ( i % 2 == 0 ) )
+                p64src[i] = ( p64src[i] << 31 ) | ( p64src[i] >> 33 ) ; // 15 rolls
+            else if ( j == 10 &&  ( i % 2 == 0 ) )
+                p64src[i] = ( p64src[i] << 9 ) | ( p64src[i] >> 55 ) ; // 15 rolls
+    }
+
+	
+/*    for ( unsigned j = 0 ; j <= 9 ; j++ )
     {
         //arithmetic manipulations
         for ( unsigned i = 1 ; i < m_blk_sz_words ; i++ )
@@ -487,24 +514,7 @@ inline void GammaCryptImpl::MakeDiffusion( unsigned * p32src) noexcept
             else if ( j == 8 &&  ( i % 2 == 0 ) )
                 p32src[i] = ( p32src[i] << 16 ) | ( p32src[i] >> 16 ) ; // 15 rolls
     }
-
-//    for ( unsigned j = 0 ; j < m_quantum_size * 8 ; j++ )
-//    {
-//        for ( unsigned i = 1 ; i < m_blk_sz_words ; i++ )
-//        {
-//            params.p_source[ i ] += params.p_source[ i - 1 ] ;
-//            //x = (x >> k) | (x << (32 - k))
-//    //        unsigned * tsrc = & params.p_source[i] ;
-//    //        asm(  
-//    //            "rol %[arg_a] , 1 \n\t" 
-//    //            :[arg_a]"=r"( *tsrc )
-//    //        ) ;
-//        }
-//        params.p_source[ 0 ] += params.p_source[ m_blk_sz_words - 1 ] ;
-//
-//        for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ )
-//            params.p_source[i] = (params.p_source[i] << 1 ) | ( params.p_source[i] >> 31 ) ;
-//    }
+*/
     
 }
 
@@ -958,25 +968,31 @@ void GammaCryptImpl::Encrypt()  // вот это и будет main_multithread
 
 inline void GammaCryptImpl::RemoveDiffusion( unsigned * p32dst ) noexcept
 {
-    for ( int j = 9 ; j >= 0 ; j-- )
+	uint64_t * p64dst = reinterpret_cast< uint64_t * >( p32dst ) ; 
+
+	for ( int j = 11 ; j >= 0 ; j-- )
     {
         // cycled shift right
-        for ( unsigned i = 0 ; i < m_blk_sz_words ; i++ ) // 38 bit rolls
+        for ( unsigned i = 0 ; i < m_blk_sz_words/2 ; i++ ) // 38 bit rolls
             if ( j < 4 )
-                p32dst[i] = ( p32dst[i] >> 1 ) | ( p32dst[i] << 31 ) ; // 6 rolls
+                p64dst[i] = ( p64dst[i] >> 1 ) | ( p64dst[i] << 63 ) ; // 6 rolls
             else if ( j == 4 )
-                p32dst[i] = ( p32dst[i] >> 4 ) | ( p32dst[i] << 28 ) ; // 4 rolls
+                p64dst[i] = ( p64dst[i] >> 4 ) | ( p64dst[i] << 60 ) ; // 4 rolls
             else if ( j == 5 )
-                p32dst[i] = ( p32dst[i] >> 2 ) | ( p32dst[i] << 30 ) ; // 2 rolls
+                p64dst[i] = ( p64dst[i] >> 2 ) | ( p64dst[i] << 62 ) ; // 2 rolls
             else if ( j == 7 )
-                p32dst[i] = ( p32dst[i] >> 5 ) | ( p32dst[i] << 27 ) ; // 5 rolls
+                p64dst[i] = ( p64dst[i] >> 5 ) | ( p64dst[i] << 59 ) ; // 5 rolls
             else if ( j == 8 &&  ( i % 2 == 0 ) )
-                p32dst[i] = ( p32dst[i] << 16 ) | ( p32dst[i] >> 16 ) ; // 15 rolls
+                p64dst[i] = ( p64dst[i] >> 16 ) | ( p64dst[i] << 48 ) ; // 15 rolls
+            else if ( j == 9 &&  ( i % 2 == 0 ) )
+                p64dst[i] = ( p64dst[i] >> 31 ) | ( p64dst[i] << 33 ) ; // 15 rolls
+            else if ( j == 10 &&  ( i % 2 == 0 ) )
+                p64dst[i] = ( p64dst[i] >> 9 ) | ( p64dst[i] << 55 ) ; // 
         //arithmetic manipulations
-        p32dst[ 0 ] -= p32dst[ m_blk_sz_words - 1 ] ;
-        for ( unsigned i = m_blk_sz_words -1 ; i > 0 ; i-- )
+        p64dst[ 0 ] -= p64dst[ m_blk_sz_words/2 - 1 ] ;
+        for ( unsigned i = m_blk_sz_words/2 -1 ; i > 0 ; i-- )
         {
-            p32dst[ i ] -= p32dst[ i - 1 ] ;
+            p64dst[ i ] -= p64dst[ i - 1 ] ;
         }
     }
 

@@ -17,7 +17,7 @@ int main(int argc, char **argv)
     
     std::ifstream ifs ; 
     std::ifstream ifs_keyfile ;
-    std::ofstream ofs ; // when generating keyfile , using this stream for keyfile
+    std::ofstream ofs ; // output file (stream), when generating keyfile , using this stream for keyfile
 
     CmdLnParser parser ;
     parser.ParseCommandLine( argc , argv ) ;
