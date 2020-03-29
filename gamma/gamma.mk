@@ -13,14 +13,14 @@ CurrentFileName        :=
 CurrentFilePath        :=
 CurrentFileFullPath    :=
 User                   :=anton
-Date                   :=18/02/20
+Date                   :=29/03/20
 CodeLitePath           :=/home/anton/.codelite
-LinkerName             :=g++
-SharedObjectLinkerName :=g++ -shared -fPIC
+LinkerName             :=/usr/bin/g++
+SharedObjectLinkerName :=/usr/bin/g++ -shared -fPIC
 ObjectSuffix           :=.o
 DependSuffix           :=.o.d
-PreprocessSuffix       :=.o.i
-DebugSwitch            :=-gstab
+PreprocessSuffix       :=.i
+DebugSwitch            :=-g 
 IncludeSwitch          :=-I
 LibrarySwitch          :=-l
 OutputSwitch           :=-o 
@@ -31,7 +31,7 @@ OutputFile             :=$(IntermediateDirectory)/$(ProjectName)
 Preprocessors          :=$(PreprocessorSwitch)NDEBUG 
 ObjectSwitch           :=-o 
 ArchiveOutputSwitch    := 
-PreprocessOnlySwitch   :=-E 
+PreprocessOnlySwitch   :=-E
 ObjectsFileList        :="gamma.txt"
 PCHCompileFlags        :=
 MakeDirCommand         :=mkdir -p
@@ -47,20 +47,20 @@ LibPath                := $(LibraryPathSwitch).
 ## Common variables
 ## AR, CXX, CC, AS, CXXFLAGS and CFLAGS can be overriden using an environment variables
 ##
-AR       := ar rcus
-CXX      := g++
-CC       := gcc
-CXXFLAGS :=  -O3 -std=c++14 -Wall $(Preprocessors)
+AR       := /usr/bin/ar rcu
+CXX      := /usr/bin/g++
+CC       := /usr/bin/gcc
+CXXFLAGS :=  -O3 -std=c++14 -Wall -march=native $(Preprocessors)
 CFLAGS   :=  -O2 -Wall $(Preprocessors)
 ASFLAGS  := 
-AS       := as
+AS       := /usr/bin/as
 
 
 ##
 ## User defined environment variables
 ##
 CodeLiteDir:=/usr/share/codelite
-Objects0=$(IntermediateDirectory)/src_LFSR.cpp$(ObjectSuffix) $(IntermediateDirectory)/main.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_check.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_randomroutines.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_helper.cpp$(ObjectSuffix) $(IntermediateDirectory)/up_Display_ConsoleDisplay_src_display.cpp$(ObjectSuffix) 
+Objects0=$(IntermediateDirectory)/src_check.cpp$(ObjectSuffix) $(IntermediateDirectory)/main.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_randomroutines.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_helper.cpp$(ObjectSuffix) $(IntermediateDirectory)/up_Display_ConsoleDisplay_src_display.cpp$(ObjectSuffix) $(IntermediateDirectory)/src_LFSR.cpp$(ObjectSuffix) 
 
 
 
@@ -91,47 +91,61 @@ PreBuild:
 ##
 ## Objects
 ##
-$(IntermediateDirectory)/src_LFSR.cpp$(ObjectSuffix): src/LFSR.cpp
-	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/src_LFSR.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/src_LFSR.cpp$(DependSuffix) -MM src/LFSR.cpp
-	$(CXX) $(IncludePCH) $(SourceSwitch) "/home/anton/1/cpp/2019/00armo/gamma/src/LFSR.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_LFSR.cpp$(ObjectSuffix) $(IncludePath)
-$(IntermediateDirectory)/src_LFSR.cpp$(PreprocessSuffix): src/LFSR.cpp
-	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/src_LFSR.cpp$(PreprocessSuffix) src/LFSR.cpp
-
-$(IntermediateDirectory)/main.cpp$(ObjectSuffix): main.cpp
-	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/main.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/main.cpp$(DependSuffix) -MM main.cpp
-	$(CXX) $(IncludePCH) $(SourceSwitch) "/home/anton/1/cpp/2019/00armo/gamma/main.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/main.cpp$(ObjectSuffix) $(IncludePath)
-$(IntermediateDirectory)/main.cpp$(PreprocessSuffix): main.cpp
-	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/main.cpp$(PreprocessSuffix) main.cpp
-
-$(IntermediateDirectory)/src_check.cpp$(ObjectSuffix): src/check.cpp
-	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/src_check.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/src_check.cpp$(DependSuffix) -MM src/check.cpp
+$(IntermediateDirectory)/src_check.cpp$(ObjectSuffix): src/check.cpp $(IntermediateDirectory)/src_check.cpp$(DependSuffix)
 	$(CXX) $(IncludePCH) $(SourceSwitch) "/home/anton/1/cpp/2019/00armo/gamma/src/check.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_check.cpp$(ObjectSuffix) $(IncludePath)
+$(IntermediateDirectory)/src_check.cpp$(DependSuffix): src/check.cpp
+	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/src_check.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/src_check.cpp$(DependSuffix) -MM src/check.cpp
+
 $(IntermediateDirectory)/src_check.cpp$(PreprocessSuffix): src/check.cpp
 	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/src_check.cpp$(PreprocessSuffix) src/check.cpp
 
-$(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix): src/gamma.cpp
-	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/src_gamma.cpp$(DependSuffix) -MM src/gamma.cpp
+$(IntermediateDirectory)/main.cpp$(ObjectSuffix): main.cpp $(IntermediateDirectory)/main.cpp$(DependSuffix)
+	$(CXX) $(IncludePCH) $(SourceSwitch) "/home/anton/1/cpp/2019/00armo/gamma/main.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/main.cpp$(ObjectSuffix) $(IncludePath)
+$(IntermediateDirectory)/main.cpp$(DependSuffix): main.cpp
+	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/main.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/main.cpp$(DependSuffix) -MM main.cpp
+
+$(IntermediateDirectory)/main.cpp$(PreprocessSuffix): main.cpp
+	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/main.cpp$(PreprocessSuffix) main.cpp
+
+$(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix): src/gamma.cpp $(IntermediateDirectory)/src_gamma.cpp$(DependSuffix)
 	$(CXX) $(IncludePCH) $(SourceSwitch) "/home/anton/1/cpp/2019/00armo/gamma/src/gamma.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix) $(IncludePath)
+$(IntermediateDirectory)/src_gamma.cpp$(DependSuffix): src/gamma.cpp
+	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/src_gamma.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/src_gamma.cpp$(DependSuffix) -MM src/gamma.cpp
+
 $(IntermediateDirectory)/src_gamma.cpp$(PreprocessSuffix): src/gamma.cpp
 	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/src_gamma.cpp$(PreprocessSuffix) src/gamma.cpp
 
-$(IntermediateDirectory)/src_randomroutines.cpp$(ObjectSuffix): src/randomroutines.cpp
-	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/src_randomroutines.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/src_randomroutines.cpp$(DependSuffix) -MM src/randomroutines.cpp
+$(IntermediateDirectory)/src_randomroutines.cpp$(ObjectSuffix): src/randomroutines.cpp $(IntermediateDirectory)/src_randomroutines.cpp$(DependSuffix)
 	$(CXX) $(IncludePCH) $(SourceSwitch) "/home/anton/1/cpp/2019/00armo/gamma/src/randomroutines.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_randomroutines.cpp$(ObjectSuffix) $(IncludePath)
+$(IntermediateDirectory)/src_randomroutines.cpp$(DependSuffix): src/randomroutines.cpp
+	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/src_randomroutines.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/src_randomroutines.cpp$(DependSuffix) -MM src/randomroutines.cpp
+
 $(IntermediateDirectory)/src_randomroutines.cpp$(PreprocessSuffix): src/randomroutines.cpp
 	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/src_randomroutines.cpp$(PreprocessSuffix) src/randomroutines.cpp
 
-$(IntermediateDirectory)/src_helper.cpp$(ObjectSuffix): src/helper.cpp
-	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/src_helper.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/src_helper.cpp$(DependSuffix) -MM src/helper.cpp
+$(IntermediateDirectory)/src_helper.cpp$(ObjectSuffix): src/helper.cpp $(IntermediateDirectory)/src_helper.cpp$(DependSuffix)
 	$(CXX) $(IncludePCH) $(SourceSwitch) "/home/anton/1/cpp/2019/00armo/gamma/src/helper.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_helper.cpp$(ObjectSuffix) $(IncludePath)
+$(IntermediateDirectory)/src_helper.cpp$(DependSuffix): src/helper.cpp
+	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/src_helper.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/src_helper.cpp$(DependSuffix) -MM src/helper.cpp
+
 $(IntermediateDirectory)/src_helper.cpp$(PreprocessSuffix): src/helper.cpp
 	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/src_helper.cpp$(PreprocessSuffix) src/helper.cpp
 
-$(IntermediateDirectory)/up_Display_ConsoleDisplay_src_display.cpp$(ObjectSuffix): ../Display/ConsoleDisplay/src/display.cpp
-	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/up_Display_ConsoleDisplay_src_display.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/up_Display_ConsoleDisplay_src_display.cpp$(DependSuffix) -MM ../Display/ConsoleDisplay/src/display.cpp
+$(IntermediateDirectory)/up_Display_ConsoleDisplay_src_display.cpp$(ObjectSuffix): ../Display/ConsoleDisplay/src/display.cpp $(IntermediateDirectory)/up_Display_ConsoleDisplay_src_display.cpp$(DependSuffix)
 	$(CXX) $(IncludePCH) $(SourceSwitch) "/home/anton/1/cpp/2019/00armo/Display/ConsoleDisplay/src/display.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/up_Display_ConsoleDisplay_src_display.cpp$(ObjectSuffix) $(IncludePath)
+$(IntermediateDirectory)/up_Display_ConsoleDisplay_src_display.cpp$(DependSuffix): ../Display/ConsoleDisplay/src/display.cpp
+	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/up_Display_ConsoleDisplay_src_display.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/up_Display_ConsoleDisplay_src_display.cpp$(DependSuffix) -MM ../Display/ConsoleDisplay/src/display.cpp
+
 $(IntermediateDirectory)/up_Display_ConsoleDisplay_src_display.cpp$(PreprocessSuffix): ../Display/ConsoleDisplay/src/display.cpp
 	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/up_Display_ConsoleDisplay_src_display.cpp$(PreprocessSuffix) ../Display/ConsoleDisplay/src/display.cpp
+
+$(IntermediateDirectory)/src_LFSR.cpp$(ObjectSuffix): src/LFSR.cpp $(IntermediateDirectory)/src_LFSR.cpp$(DependSuffix)
+	$(CXX) $(IncludePCH) $(SourceSwitch) "/home/anton/1/cpp/2019/00armo/gamma/src/LFSR.cpp" $(CXXFLAGS) $(ObjectSwitch)$(IntermediateDirectory)/src_LFSR.cpp$(ObjectSuffix) $(IncludePath)
+$(IntermediateDirectory)/src_LFSR.cpp$(DependSuffix): src/LFSR.cpp
+	@$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) -MG -MP -MT$(IntermediateDirectory)/src_LFSR.cpp$(ObjectSuffix) -MF$(IntermediateDirectory)/src_LFSR.cpp$(DependSuffix) -MM src/LFSR.cpp
+
+$(IntermediateDirectory)/src_LFSR.cpp$(PreprocessSuffix): src/LFSR.cpp
+	$(CXX) $(CXXFLAGS) $(IncludePCH) $(IncludePath) $(PreprocessOnlySwitch) $(OutputSwitch) $(IntermediateDirectory)/src_LFSR.cpp$(PreprocessSuffix) src/LFSR.cpp
 
 
 -include $(IntermediateDirectory)/*$(DependSuffix)

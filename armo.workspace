@@ -4,13 +4,13 @@
   <Project Name="threads" Path="threads/threads.project" Active="No"/>
   <Project Name="test" Path="test/test.project" Active="No"/>
   <BuildMatrix>
-    <WorkspaceConfiguration Name="Debug" Selected="yes">
+    <WorkspaceConfiguration Name="Debug" Selected="no">
       <Environment/>
       <Project Name="gamma" ConfigName="Debug"/>
       <Project Name="threads" ConfigName="Debug"/>
       <Project Name="test" ConfigName="Debug"/>
     </WorkspaceConfiguration>
-    <WorkspaceConfiguration Name="Release" Selected="no">
+    <WorkspaceConfiguration Name="Release" Selected="yes">
       <Environment/>
       <Project Name="gamma" ConfigName="Release"/>
       <Project Name="threads" ConfigName="Release"/>

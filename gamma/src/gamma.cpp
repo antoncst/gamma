@@ -464,7 +464,7 @@ inline void GammaCryptImpl::MakeDiffusion( unsigned * p32src) noexcept
 
 	uint64_t * p64src = reinterpret_cast< uint64_t * >( p32src ) ; 
 
-    for ( unsigned j = 0 ; j <= 11 ; j++ )
+    for ( unsigned j = 0 ; j <= 8 ; j++ )
     {
         //arithmetic manipulations
         for ( unsigned i = 1 ; i < m_blk_sz_words / 2 ; i++ ) // /2 because of uint64_t
@@ -474,21 +474,21 @@ inline void GammaCryptImpl::MakeDiffusion( unsigned * p32src) noexcept
         p64src[ 0 ] += p64src[ m_blk_sz_words/2 - 1 ] ;
 
         // left circular shift
-        for ( unsigned i = 0 ; i < m_blk_sz_words / 2 ; i++ ) // 32 bit rolls
-            if ( j < 4 )
-                p64src[i] = ( p64src[i] << 1 ) | ( p64src[i] >> 63 ) ; // 6 rolls
+        for ( unsigned i = 0 ; i < m_blk_sz_words / 2 ; i++ ) 
+            if ( j == 0 || j == 2 )
+                p64src[i] = ( p64src[i] << 1 ) | ( p64src[i] >> 63 ) ; 
+            else if ( j == 1 )
+                p64src[i] = ( p64src[i] << 2 ) | ( p64src[i] >> 62 ) ; 
+            else if ( j == 3 )
+                p64src[i] = ( p64src[i] << 3 ) | ( p64src[i] >> 61 ) ; 
             else if ( j == 4 )
-                p64src[i] = ( p64src[i] << 4 ) | ( p64src[i] >> 60 ) ; // 4 rolls
-            else if ( j == 5 )
-                p64src[i] = ( p64src[i] << 2 ) | ( p64src[i] >> 62 ) ; // 2 rolls
-            else if ( j == 7 )
-                p64src[i] = ( p64src[i] << 5 ) | ( p64src[i] >> 59 ) ; // 5 rolls
-            else if ( j == 8 &&  ( i % 2 == 0 ) )
-                p64src[i] = ( p64src[i] << 16 ) | ( p64src[i] >> 48 ) ; // 15 rolls
-            else if ( j == 9 &&  ( i % 2 == 0 ) )
-                p64src[i] = ( p64src[i] << 31 ) | ( p64src[i] >> 33 ) ; // 15 rolls
-            else if ( j == 10 &&  ( i % 2 == 0 ) )
-                p64src[i] = ( p64src[i] << 9 ) | ( p64src[i] >> 55 ) ; // 15 rolls
+                p64src[i] = ( p64src[i] << 7 ) | ( p64src[i] >> 57 ) ; 
+            else if ( j == 5 &&  ( i % 2 == 0 ) )
+                p64src[i] = ( p64src[i] << 16 ) | ( p64src[i] >> 48 ) ;
+            else if ( j == 6 &&  ( i % 2 == 0 ) )
+                p64src[i] = ( p64src[i] << 31 ) | ( p64src[i] >> 33 ) ;
+            else if ( j == 7 &&  ( i % 2 == 0 ) )
+                p64src[i] = ( p64src[i] << 1 ) | ( p64src[i] >> 63 ) ; 
     }
 
 	
@@ -970,24 +970,24 @@ inline void GammaCryptImpl::RemoveDiffusion( unsigned * p32dst ) noexcept
 {
 	uint64_t * p64dst = reinterpret_cast< uint64_t * >( p32dst ) ; 
 
-	for ( int j = 11 ; j >= 0 ; j-- )
+	for ( int j = 8 ; j >= 0 ; j-- )
     {
         // cycled shift right
         for ( unsigned i = 0 ; i < m_blk_sz_words/2 ; i++ ) // 38 bit rolls
-            if ( j < 4 )
+            if ( j == 0 || j == 2 )
                 p64dst[i] = ( p64dst[i] >> 1 ) | ( p64dst[i] << 63 ) ; // 6 rolls
+            else if ( j == 1 )
+                p64dst[i] = ( p64dst[i] >> 2 ) | ( p64dst[i] << 62 ) ; // 4 rolls
+            else if ( j == 3 )
+                p64dst[i] = ( p64dst[i] >> 3 ) | ( p64dst[i] << 61 ) ; // 2 rolls
             else if ( j == 4 )
-                p64dst[i] = ( p64dst[i] >> 4 ) | ( p64dst[i] << 60 ) ; // 4 rolls
-            else if ( j == 5 )
-                p64dst[i] = ( p64dst[i] >> 2 ) | ( p64dst[i] << 62 ) ; // 2 rolls
-            else if ( j == 7 )
-                p64dst[i] = ( p64dst[i] >> 5 ) | ( p64dst[i] << 59 ) ; // 5 rolls
-            else if ( j == 8 &&  ( i % 2 == 0 ) )
+                p64dst[i] = ( p64dst[i] >> 7 ) | ( p64dst[i] << 57 ) ; // 5 rolls
+            else if ( j == 5 &&  ( i % 2 == 0 ) )
                 p64dst[i] = ( p64dst[i] >> 16 ) | ( p64dst[i] << 48 ) ; // 15 rolls
-            else if ( j == 9 &&  ( i % 2 == 0 ) )
+            else if ( j == 6 &&  ( i % 2 == 0 ) )
                 p64dst[i] = ( p64dst[i] >> 31 ) | ( p64dst[i] << 33 ) ; // 15 rolls
-            else if ( j == 10 &&  ( i % 2 == 0 ) )
-                p64dst[i] = ( p64dst[i] >> 9 ) | ( p64dst[i] << 55 ) ; // 
+            else if ( j == 7 &&  ( i % 2 == 0 ) )
+                p64dst[i] = ( p64dst[i] >> 1 ) | ( p64dst[i] << 63 ) ; // 
         //arithmetic manipulations
         p64dst[ 0 ] -= p64dst[ m_blk_sz_words/2 - 1 ] ;
         for ( unsigned i = m_blk_sz_words/2 -1 ; i > 0 ; i-- )
