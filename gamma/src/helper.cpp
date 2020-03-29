@@ -2,7 +2,7 @@
 #include "helper.h"
 #include "../Display/ConsoleDisplay/include/display.h"
 #include "../platform.h"
-
+#include <stdio.h>
 using namespace std ;
 
 #ifdef LINUX
@@ -87,6 +87,15 @@ void OpenInFile(const std::string in_filename , std::ifstream & ifs )
 
 void OpenOutFile( const std::string out_filename , std::ofstream & ofs )
 {
+	if ( FILE* fp = fopen( out_filename.c_str() , "r" )	)
+	{
+		fclose( fp ) ;
+		display_str( "\nFile exists, rewrite (y/n)?" );
+		string answer;
+		edit_string( answer );
+		if ( answer != "y" && answer != "Y" )
+			throw( "\nFile already exists" ) ;
+	}
     ofs.open( out_filename.c_str(), ofstream::out | ofstream::binary | ofstream::trunc ) ;
 
     if ( ! ofs.is_open() )
@@ -188,9 +197,8 @@ void CmdLnParser::ParseCommandLine( int argc , char **argv )
         display_str( help_string ) ;
         return ;
     }
-    else
-        if ( action == none)
-            action = encrypt ;
+    else if ( action == none)
+		action = encrypt ;
 
     if ( action == encrypt)
     {
@@ -198,7 +206,13 @@ void CmdLnParser::ParseCommandLine( int argc , char **argv )
         m_out_filename = "encrypted" ; // "/home/anton/ramdisk/encrypted" ; //
 		psw_input_twice = true ;
     }
-    else
+    else if ( action == genkey )
+	{
+        m_in_filename ="" ; // "/home/anton/ramdisk/source" ; //
+        m_out_filename = "keyfile" ; // "/home/anton/ramdisk/encrypted" ; //
+		psw_input_twice = true ;
+	}
+	else
     {
         m_in_filename = "encrypted" ; // "/home/anton/ramdisk/encrypted" ; //
         m_out_filename = "source" ; // "/home/anton/ramdisk/source" ; //
