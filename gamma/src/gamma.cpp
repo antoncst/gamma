@@ -780,7 +780,15 @@ void GammaCryptImpl::Encrypt()  // вот это и будет main_multithread
     
     if ( mb_use_keyfile )
     {
-        ReadOverheadData( m_ifs_keyfile ) ;
+        try 
+		{
+			ReadOverheadData( m_ifs_keyfile ) ;
+		}
+		catch( const char * s )
+		{
+			display_err( s ) ;
+			return ;
+		}
     }
     else
     {
@@ -1137,9 +1145,29 @@ void GammaCryptImpl::Decrypt()
     MakePswBlock() ;
 
     if ( mb_use_keyfile )
-        ReadOverheadData( m_ifs_keyfile ) ;
+	{
+        try 
+		{
+			ReadOverheadData( m_ifs_keyfile ) ;
+		}
+		catch( const char * s )
+		{
+			display_err( s ) ;
+			return ;
+		}
+	}	
     else
-        ReadOverheadData( m_ifs ) ;
+	{
+        try 
+		{
+			ReadOverheadData( m_ifs ) ;
+		}
+		catch( const char * s )
+		{
+			display_err( s ) ;
+			return ;
+		}
+	}	
     
         #ifdef DBG_INFO_ENBLD
         // cout pma
@@ -1269,9 +1297,9 @@ void GammaCryptImpl::ReadOverheadData( std::istream & ifs )
     {
         m_Permutate.m16e_arr[ i ] = m_Permutate.m_BIarray[ i ] ;
     }
-	#ifdef DEBUG
-		CheckPermutArr( m_Permutate.m16e_arr , m_Permutate.epma_size_elms ) ;
-	#endif
+	if ( !CheckPermutArr( m_Permutate.m16e_arr , m_Permutate.epma_size_elms ) )
+		throw( "wrong password" ) ;
+		
 
 
     // Permutation Array 2
@@ -1294,9 +1322,9 @@ void GammaCryptImpl::ReadOverheadData( std::istream & ifs )
     {
         m_Permutate.m16e_arr2[ i ] = m_Permutate.m_BIarray2[ i ] ; // todo get out get()
     }
-	#ifdef DEBUG
-		CheckPermutArr( m_Permutate.m16e_arr2 , m_Permutate.epma_size_elms ) ;
-	#endif
+
+	if ( !CheckPermutArr( m_Permutate.m16e_arr2 , m_Permutate.epma_size_elms ) )
+		throw( "wrong password" ) ;
 
 } ;
 

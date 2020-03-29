@@ -134,10 +134,10 @@ private:
                                 // относительно начала файла (заголовка) , то есть размер заголовка
         uint8_t reserved = 0 ;
         // 0x04
-        uint64_t source_file_size ; // размер исходного файла
-        // 0x0C
         uint16_t h_block_size ; // размер блока (ключа и пр.). h_ (header) - чтобы не путаться с другими "block_size"
         uint16_t reserved2 = 0 ;
+        // 0x0C
+        uint64_t source_file_size ; // размер исходного файла
     } m_header ; 
 
     bool mb_multithread = false ;

@@ -191,7 +191,7 @@ void CmdLnParser::ParseCommandLine( int argc , char **argv )
         m_b_error = true ;
         display_err( "key file cannot be used with block size specified" ) ;
     }
-        
+	
     if ( m_b_error )
     {
         display_str( help_string ) ;
@@ -218,6 +218,11 @@ void CmdLnParser::ParseCommandLine( int argc , char **argv )
         m_out_filename = "source" ; // "/home/anton/ramdisk/source" ; //
 		psw_input_twice = false ;
     }
+
+	if ( mb_use_keyfile && action == encrypt )
+	{
+		psw_input_twice = false ;
+	}
     
     if ( n_infile )
         m_in_filename = argv[ n_infile ] ;
