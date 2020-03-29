@@ -35,7 +35,7 @@ inline void MakeDiffusion( unsigned * p32src) noexcept
             else if ( j == 6 &&  ( i % 2 == 0 ) )
                 p64src[i] = ( p64src[i] << 31 ) | ( p64src[i] >> 33 ) ;
             else if ( j == 7 &&  ( i % 2 == 0 ) )
-                p64src[i] = ( p64src[i] << 1 ) | ( p64src[i] >> 63 ) ; 
+                p64src[i] = ( p64src[i] << 58 ) | ( p64src[i] >> 6 ) ; 
     }
 }
 
