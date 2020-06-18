@@ -120,6 +120,8 @@ private:
 
 	unsigned char * m8_temp_block ;
 	
+	const uint16_t m_magic_word = 0xb5a9 ;
+	
     struct t_header
     {
         // 0x00
@@ -135,8 +137,8 @@ private:
         uint8_t reserved = 0 ;
         // 0x04
         uint16_t h_block_size ; // размер блока (ключа и пр.). h_ (header) - чтобы не путаться с другими "block_size"
-        uint16_t reserved2 = 0 ;
-        // 0x0C
+        uint16_t magic ;  // = m_magic_word ;
+        // 0x08
         uint64_t source_file_size ; // размер исходного файла
     } m_header ; 
 

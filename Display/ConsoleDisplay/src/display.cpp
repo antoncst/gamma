@@ -319,7 +319,9 @@ void display_str( const std::string & str )
 
 void display_err( const std::string & str )
 {
-    std::cerr << str << std::endl ;
+    //std::cerr << str << std::endl ;
+    std::cout << str << std::endl ;
+	
 }
 
 void do_progress_bar()

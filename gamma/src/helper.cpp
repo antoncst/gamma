@@ -80,22 +80,26 @@ void OpenInFile(const std::string in_filename , std::ifstream & ifs )
     ifs.open( in_filename.c_str() , ifstream::in | ifstream::binary ) ;
     if ( ! ifs.is_open() )
     {
-        display_str( help_string ) ;
+        //display_str( help_string ) ;
         throw( " Error opening input file for reading" ) ;
     }
 }
 
-void OpenOutFile( const std::string out_filename , std::ofstream & ofs )
+void OpenOutFile( const std::string out_filename , std::ofstream & ofs , bool bforce_overwrite )
 {
-	if ( FILE* fp = fopen( out_filename.c_str() , "r" )	)
+	if ( ! bforce_overwrite  )
 	{
-		fclose( fp ) ;
-		display_str( "\nFile exists, rewrite (y/n)?" );
-		string answer;
-		edit_string( answer );
-		if ( answer != "y" && answer != "Y" )
-			throw( "\nFile already exists" ) ;
+		if ( FILE* fp = fopen( out_filename.c_str() , "r" )	)
+		{
+			fclose( fp ) ;
+			display_str( "\nFile exists, rewrite (y/n)?" );
+			string answer;
+			edit_string( answer );
+			if ( answer != "y" && answer != "Y" )
+				throw( "\nFile already exists" ) ;
+		}
 	}
+
     ofs.open( out_filename.c_str(), ofstream::out | ofstream::binary | ofstream::trunc ) ;
 
     if ( ! ofs.is_open() )
@@ -151,9 +155,22 @@ void CmdLnParser::ParseCommandLine( int argc , char **argv )
                     }
                     else
                         { m_b_error = true ; break ; } 
+                else if ( s == "-p" || s == "--psw" )
+                    if ( i + 1 < argc  )
+                    {
+                        m_password = argv[ i+1 ] ;
+                        i++ ;
+                        mb_psw_specified = true ;
+                    }
+                    else
+                        { m_b_error = true ; break ; } 
                 else if ( s == "-k" || s == "--keyfile" )
                     {
                         mb_use_keyfile = true ;
+                    }
+                else if ( s == "-f" || s == "--force" )
+                    {
+                        mb_force_overwrite = true ;
                     }
                 else if ( s == "-pb" || s == "--permutate_bits" )
                     {

@@ -11,12 +11,12 @@
 #include <cstdio>
 #include <memory>
 
-int main(int argc, char **argv)
+int main2(int argc, char **argv)
 {
     //std::ios::sync_with_stdio(false);
     
     std::ifstream ifs ; 
-    std::ifstream ifs_keyfile ;
+    std::ifstream ifs_keyfile ; 
     std::ofstream ofs ; // output file (stream), when generating keyfile , using this stream for keyfile
 
     CmdLnParser parser ;
@@ -40,8 +40,9 @@ int main(int argc, char **argv)
     
     std::string password ;
     password = "1234567890AB" ;
-    
-    if ( ! EnterPassword( password , parser.psw_input_twice ) )
+	if ( parser.mb_psw_specified )
+		password = parser.m_password ;
+	else if ( ! EnterPassword( password , parser.psw_input_twice ) )
         return 2 ;
     
     std::unique_ptr<GammaCrypt> gm = std::make_unique<GammaCryptImpl>( ifs , ofs , password ) ;
@@ -55,9 +56,9 @@ int main(int argc, char **argv)
     try
     {
         if ( parser.action != parser.genkey )
-            OpenOutFile( parser.m_out_filename , ofs ) ;
+            OpenOutFile( parser.m_out_filename , ofs , parser.mb_force_overwrite ) ;
         else // genkey
-            OpenOutFile( gm->GetKeyFilename() , ofs ) ;
+            OpenOutFile( gm->GetKeyFilename() , ofs , parser.mb_force_overwrite ) ;
     }
     catch ( const char * s )
     {
@@ -89,11 +90,20 @@ int main(int argc, char **argv)
         
     ifs.close() ;
     ofs.close() ;
-    
+	
     #ifdef DEBUG
-        //std::cout << " Press Enter" << std::endl ;
-        //getchar() ;
+        std::cout << " Press Enter" << std::endl ;
+        getchar() ;
     #endif
     
     return 0;
 } ;
+
+int main(int argc, char **argv)
+{
+	int retval = main2( argc , argv ) ;
+	display_str( "done" ) ;
+    
+	return retval ;
+}
+

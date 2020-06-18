@@ -1249,7 +1249,17 @@ void GammaCryptImpl::ReadHead( std::istream & ifs )
     //Header
     ifs.read( (char*) &m_header , sizeof( t_header ) ) ;
     if ( (unsigned) ifs.gcount() <  sizeof( t_header ) )
-        throw ("error: File too short, missing header") ;
+	{
+        throw( "error: File too short, missing header" ) ; 
+	}
+	//
+	if ( m_header.magic != m_magic_word )
+		throw( "error: this is not gamma crypt file" ) ;
+	
+	// checking version correction   cur_ver                      cur_ver
+	if ( ( (m_header.major_ver & 0x3f) > 0 ) && ( m_header.minor_ver > 0 ) )
+		throw( "error: header version error") ;
+		
     if ( m_header.major_ver & 0x40 )
         m_perm_bytes = false ;
 }
@@ -1343,6 +1353,7 @@ void GammaCryptImpl::WriteHead()
         m_header.major_ver |= 0x40 ;
     }
     //Header
+	m_header.magic = m_magic_word ;
     m_header.data_offset = sizeof( t_header ) ;
     m_header.h_block_size = m_block_size_bytes ;
     m_ofs.write( (char*) &m_header , sizeof( t_header ) ) ;

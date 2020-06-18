@@ -15,6 +15,8 @@ bool CheckPermutArr( uint16_t * arr , unsigned size )
                 std::stringstream sstream ;
                 sstream << "CheckPermutArr error: too big value at " << i << std::endl ;
                 display_err( sstream.str() ) ;
+				#else
+				break ;
 				#endif
         }
         for ( unsigned j = i + 1 ; j < size ; j++ )
@@ -26,6 +28,8 @@ bool CheckPermutArr( uint16_t * arr , unsigned size )
                 std::stringstream sstream ;
                 sstream << "CheckPermutArr error: duples at " << i << " , " << j << std::endl ;
                 display_err( sstream.str() ) ;
+				#else
+				break ;
 				#endif
             }
         }

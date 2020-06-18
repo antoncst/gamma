@@ -8,7 +8,7 @@ bool EnterPassword( std::string & password , bool twice ) ;
 
 void OpenInFile(const std::string in_filename , std::ifstream & ifs ) ;
 
-void OpenOutFile( const std::string out_filename , std::ofstream & ofs ) ;
+void OpenOutFile( const std::string out_filename , std::ofstream & ofs , bool bforce_overwrite ) ;
 
 
 class CmdLnParser
@@ -18,6 +18,7 @@ public:
     std::string m_in_filename ;
     std::string m_out_filename ;
     std::string m_keyfilename ;
+    std::string m_password ;
 
     CmdLnParser() ;
     void ParseCommandLine( int argc , char **argv ) ;
@@ -34,6 +35,8 @@ public:
     } action ;
     
     bool mb_blocksize_specified = false ;
+	bool mb_psw_specified = false ;
+	bool mb_force_overwrite = false ;
     bool mb_use_keyfile = false ;
     bool mb_perm_bits = false ;
     unsigned m_block_size ;
@@ -51,6 +54,8 @@ static const std::string help_string  =
     "-e --encrypt [source_file] [encrypted_file]\n"
     "-d --decrypt [encrypted_file] [source_file]\n"
     "-gk --genkey    generate keys to keyfile\n"
+	"-p --psw password\n"
+	"-f --force    do not prompt overwrite"
     "\n"
     "default command is --encrypt\n"
     "default source_file is 'source'\n"
